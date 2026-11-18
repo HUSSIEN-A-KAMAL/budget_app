@@ -1,0 +1,61 @@
+# ==============================================================================
+# Dockerignore for FastAPI Standalone Budget App
+# Prevents sensitive data, local environments, and caches from entering the image
+# ==============================================================================
+
+# Version Control & Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python Bytecode & Cache Directories
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & Coverage Artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Databases & SQLite Storage (Do not bundle local development database)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+budget_standalone.db
+
+# Secrets & Environment Configurations
+.env
+.env.*
+*.env
+*.local
+
+# IDE & Operating System Artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker / Compose helper files
+Dockerfile*
+docker-compose*
