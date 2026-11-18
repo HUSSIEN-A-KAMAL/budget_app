@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}بوابة شؤون العاملين{% endblock %}</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Attendance">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Google Fonts: Cairo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+        [x-cloak] { display: none !important; }
+        
+        /* Print Styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white;
+            }
+            .print-break-inside-avoid {
+                break-inside: avoid;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col bg-slate-100 m-0 p-0 text-slate-800 font-sans antialiased">
+    <main class="flex-1 pb-16 w-full">
+        {% block content %}
+        {% endblock %}
+    </main>
+    
+    <!-- Unified Global Dark Sticky Footer for Screen View -->
+    <footer class="print:hidden fixed bottom-0 inset-x-0 z-50 bg-[#0B0F19]/95 backdrop-blur-md border-t border-slate-800 text-slate-300 py-2.5 px-6 shadow-2xl transition-all duration-300">
+        <div class="w-full max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+            
+            <!-- Left: Developer Signature & HK Badge -->
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-fuchsia-500 p-[1.5px] shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+                    <div class="w-full h-full bg-[#0B0F19] rounded-[10px] flex items-center justify-center font-black text-[11px] text-white tracking-tighter">
+                        HK
+                    </div>
+                </div>
+                <div class="text-left">
+                    <div class="text-[8px] uppercase tracking-widest text-slate-400 font-bold leading-tight">
+                        SYSTEM ARCHITECT & DEVELOPER
+                    </div>
+                    <div class="text-xs font-black tracking-wider text-sky-400 leading-tight">
+                        HUSSIEN KAMAL
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center: Corporate Copyright / System Notice -->
+            <div class="text-center text-slate-400 font-medium text-[11px]">
+                Smart Attendance Analytics Platform © 2026 All Rights Reserved
+            </div>
+
+            <!-- Right: Department Badge -->
+            <div class="flex items-center">
+                <span class="px-3.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 shadow-inner">
+                    General Administration of Administrative Affairs
+                </span>
+            </div>
+
+        </div>
+    </footer>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/static/sw.js').catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+</body>
+</html>

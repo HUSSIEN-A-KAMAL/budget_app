@@ -1,0 +1,54 @@
+<!-- Standardized Official Corporate Print Header Component -->
+<div class="hidden print:block mb-4 pb-3 border-b-2 border-slate-900 w-full">
+    <div class="flex items-center justify-between">
+        <!-- Right: Company & Department Info -->
+        <div class="text-right">
+            <h2 class="text-lg font-black text-slate-900 leading-tight">شركة شمال البحرية للبترول (نوربيتكـو)</h2>
+            <p class="text-[11px] font-bold text-slate-600 mt-0.5">الإدارة العامة للشئون الإدارية • إدارة الموارد البشرية</p>
+        </div>
+
+        <!-- Center: Prominent Title Badge -->
+        <div class="text-center">
+            <div class="border-2 border-slate-900 px-6 py-1.5 rounded-xl bg-slate-50 shadow-sm inline-block">
+                <h1 class="text-sm font-black text-slate-900 leading-tight">
+                    {{ report_title | default('تقرير متابعة الحضور والإنتاجية') }}
+                </h1>
+                {% if report_subtitle %}
+                <div class="text-[11px] font-extrabold text-indigo-950 mt-0.5" id="print-report-subtitle">
+                    {{ report_subtitle }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Left: Date / Month Info -->
+        <div class="text-left flex flex-col justify-center">
+            <div class="text-xs font-bold text-slate-800" dir="rtl">
+                <span class="print-header-date-label">{{ report_date_label | default('التاريخ:') }}</span> <span class="print-header-date font-mono text-slate-900 font-black">{% if report_date_value %}{{ report_date_value }}{% endif %}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function updateHeaderDates() {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+        document.querySelectorAll('.print-header-date').forEach(el => {
+            if (!el.textContent || !el.textContent.trim()) {
+                el.textContent = dateStr;
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateHeaderDates);
+    } else {
+        updateHeaderDates();
+    }
+    window.addEventListener('beforeprint', updateHeaderDates);
+})();
+</script>

@@ -1,0 +1,65 @@
+<!-- Standardized Official Corporate Print Footer Component -->
+<style>
+@media print {
+    .print-footer {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: #ffffff !important;
+        z-index: 9999 !important;
+        padding-top: 6px !important;
+        padding-bottom: 4px !important;
+        margin-top: 0 !important;
+    }
+}
+</style>
+
+<div class="print-footer hidden print:flex items-center justify-between pt-2.5 mt-6 border-t-2 border-slate-900 w-full text-slate-900">
+    <!-- Left: Developer Badge -->
+    <div class="flex items-center gap-2.5 border border-slate-300 rounded-lg px-2.5 py-1 bg-slate-50">
+        <div>
+            <div class="text-[8px] tracking-wider uppercase font-bold text-slate-500 leading-tight">SYSTEM ARCHITECT & LEAD DEVELOPER</div>
+            <div class="text-[11px] font-black text-slate-900 tracking-wide leading-tight">HUSSIEN KAMAL</div>
+        </div>
+        <div class="text-slate-700 pl-1.5 border-l border-slate-200">
+            <i class="ph ph-stack text-base"></i>
+        </div>
+    </div>
+
+    <!-- Center: Formatted Real-time Timestamp -->
+    <div class="text-center text-[10px] font-bold text-slate-800" dir="rtl">
+        تاريخ الطباعة: <span id="print-timestamp" dir="ltr" class="print-timestamp-val font-bold text-slate-900 inline-block font-mono"></span>
+    </div>
+
+    <!-- Right: Corporate Document Info -->
+    <div class="text-right">
+        <div class="text-[11px] font-bold text-slate-900 leading-tight">Enterprise Attendance & HR Analytics System</div>
+        <div class="text-[9px] text-slate-500 font-semibold leading-tight">
+            Confidential Document • Generated from Norpetco Portal
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function updatePrintTimestamps() {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const formatted = `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+        document.querySelectorAll('.print-timestamp-val, #print-timestamp').forEach(el => {
+            el.textContent = formatted;
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updatePrintTimestamps);
+    } else {
+        updatePrintTimestamps();
+    }
+    window.addEventListener('beforeprint', updatePrintTimestamps);
+})();
+</script>

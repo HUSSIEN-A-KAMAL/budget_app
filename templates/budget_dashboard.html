@@ -1,0 +1,2471 @@
+{% extends "base.html" %}
+
+{% block title %}نظام الموازنة وترشيد النفقات والتحفيز | بوابة العاملين{% endblock %}
+
+{% block content %}
+<style>
+@page {
+    size: A4 portrait;
+    margin: 10mm 12mm 15mm 12mm;
+}
+
+@media screen {
+    body > footer:not(#custom-hk-footer),
+    main + footer,
+    footer:not(#custom-hk-footer) {
+        display: none !important;
+    }
+    body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 55px !important;
+    }
+}
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm 12mm 15mm 12mm;
+    }
+    header, nav, aside, button, #sidebar, .no-print,
+    #custom-hk-footer,
+    footer:not(.print-footer) {
+        display: none !important;
+    }
+    body, html {
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        color: black !important;
+        font-size: 11px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .printable-container {
+        margin-bottom: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 35px !important;
+        max-width: 100% !important;
+    }
+    /* Explicit 3-Page Print Layout Rules */
+    .print-page-1 {
+        page-break-after: always !important;
+        break-after: page !important;
+        min-height: 88vh;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        gap: 1.75rem !important;
+        padding-top: 0.5rem !important;
+    }
+    .print-page-2 {
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-before: always !important;
+        break-before: page !important;
+        min-height: 88vh;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        gap: 2rem !important;
+        width: 100% !important;
+    }
+    .print-page-3 {
+        page-break-after: auto !important;
+        page-break-before: always !important;
+        break-before: page !important;
+        padding-top: 0.5rem !important;
+    }
+    /* Prevent chart distortion and overlapping in print */
+    .chart-container-print {
+        width: 100% !important;
+        height: 350px !important;
+        max-height: 350px !important;
+        position: relative !important;
+        display: block !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    .chart-container-print canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 340px !important;
+    }
+    .print-chart-card {
+        width: 100% !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-bottom: 1rem !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: none !important;
+    }
+    .bg-white, .rounded-2xl, .shadow-sm, tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+}
+.budget-zebra-odd {
+    background-color: #ffffff;
+}
+.budget-zebra-even {
+    background-color: #e2e8f0;
+}
+.budget-zebra-row:hover {
+    background-color: #e0e7ff !important;
+}
+</style>
+
+<div x-data="budgetDashboard()" x-init="init()" class="w-full">
+<!-- Top Header -->
+<header class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-lg sticky top-0 z-50 border-b border-indigo-800/40 no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center text-white border border-white/20 shadow-md">
+                <i class="ph-bold ph-coins text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-black text-white tracking-tight">
+                    نظام الموازنة وترشيد النفقات والتحفيز
+                </h1>
+                <p class="text-[10px] text-indigo-200 font-bold uppercase tracking-wider">Departmental Budget Allocation, Actual Spend & Savings Analytics</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <!-- 👤 Prominent Dynamic Logged-in User Identity Card (Name, Job Title/Role, General Department) -->
+            <div class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 shadow-inner">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
+                    <i class="ph-fill ph-user-circle text-xl"></i>
+                </div>
+                <div class="text-right leading-tight">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-black text-white" x-text="actor.name || '{{ user.name if user else '' }}'"></span>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-900 text-emerald-400 border border-slate-700"
+                              x-text="'#' + (actor.emp_id || '{{ user.emp_id if user else '' }}')"></span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-bold mt-0.5">
+                        <span class="text-indigo-300" x-text="actor.job_title || roleBadgeLabel()"></span>
+                        <span class="text-slate-500">•</span>
+                        <span class="text-emerald-300" x-text="actor.effective_dept || actor.general_dept || '{{ user.department if user else 'الإدارة العامة' }}'"></span>
+                    </div>
+                </div>
+            </div>
+
+            {% if user and user.role == 'admin' %}
+            <!-- 🧪 Admin Role Simulator (Visible Only to System Admin) -->
+            <div x-show="actor.is_real_admin" x-cloak class="flex items-center gap-1.5 bg-indigo-950/90 border border-indigo-500/40 rounded-xl px-2.5 py-1 shadow-inner">
+                <span class="text-[10px] font-black text-indigo-300 flex items-center gap-1">
+                    <i class="ph-fill ph-magic-wand text-amber-400"></i> محاكاة الدور:
+                </span>
+                <select x-model="simulator.role" @change="onSimulatorChange()"
+                        class="bg-slate-900 border border-indigo-500/40 rounded-lg px-2 py-1 text-[11px] font-extrabold text-white outline-none cursor-pointer">
+                    <option value="ADMIN">مدير النظام (Admin - الكل)</option>
+                    <option value="EMPLOYEE">موظف إدارة (Standard Employee)</option>
+                    <option value="DEPT_GM">مدير عام إدارة (Department GM)</option>
+                    <option value="HSE_OFFICER">مسؤول السلامة (HSE Officer)</option>
+                </select>
+                <select x-show="simulator.role === 'EMPLOYEE' || simulator.role === 'DEPT_GM'"
+                        x-model="simulator.dept" @change="fetchDashboard()"
+                        class="bg-slate-900 border border-emerald-500/40 rounded-lg px-2 py-1 text-[11px] font-bold text-emerald-300 outline-none cursor-pointer max-w-[165px]">
+                    <template x-for="d in availableDepartments" :key="d">
+                        <option :value="d" x-text="d"></option>
+                    </template>
+                </select>
+            </div>
+
+            <button type="button"
+                    x-show="actor.is_real_admin" x-cloak
+                    @click="openUsersModal()"
+                    title="دليل الموظفين وإدارة الصلاحيات والمستخدمين"
+                    class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600/40 hover:bg-violet-600/60 text-white border border-violet-400/40 backdrop-blur-sm transition-colors shadow-sm cursor-pointer text-xs font-bold print:hidden">
+                <i class="ph ph-users-three text-base text-violet-300"></i>
+                <span>إدارة الموظفين</span>
+            </button>
+
+            <button type="button"
+                    x-show="actor.is_real_admin" x-cloak
+                    @click="openRbacSettingsModal()"
+                    title="إعدادات حوكمة الموازنة وصلاحيات HSE والمدير العام"
+                    class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/40 hover:bg-indigo-600/60 text-white border border-indigo-400/40 backdrop-blur-sm transition-colors shadow-sm cursor-pointer text-xs font-bold print:hidden">
+                <i class="ph ph-sliders-horizontal text-base text-indigo-300"></i>
+                <span>إعدادات الحوكمة</span>
+            </button>
+            {% endif %}
+
+            <button type="button"
+                    onclick="window.print()" 
+                    title="طباعة التقرير الرسمي" 
+                    class="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600/40 hover:bg-emerald-600/60 text-white border border-emerald-400/40 backdrop-blur-sm transition-colors shadow-sm cursor-pointer active:scale-95 text-xs font-bold print:hidden">
+                <i class="ph ph-printer text-lg text-emerald-300"></i>
+                <span>طباعة التقرير</span>
+            </button>
+
+            <a href="/logout"
+               title="تسجيل الخروج / تبديل المستخدم"
+               class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-900/60 text-slate-200 hover:text-white border border-slate-700 transition-colors text-xs font-bold print:hidden">
+                <i class="ph ph-sign-out text-base text-rose-400"></i>
+                <span class="hidden md:inline">خروج</span>
+            </a>
+        </div>
+    </div>
+</header>
+
+<div class="max-w-7xl mx-auto px-4 py-6 mb-20 printable-container">
+
+    <!-- Toast Notification -->
+    <div x-show="toast.show" 
+         x-transition.opacity
+         class="fixed bottom-14 left-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border text-white font-bold text-xs no-print"
+         :class="toast.type === 'success' ? 'bg-emerald-600 border-emerald-700' : 'bg-rose-600 border-rose-700'"
+         x-cloak>
+        <i class="text-lg" :class="toast.type === 'success' ? 'ph-fill ph-check-circle' : 'ph-fill ph-warning-circle'"></i>
+        <span x-text="toast.message"></span>
+    </div>
+
+    <!-- Top Executive Filter Bar -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6 no-print">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <!-- Left/Right Filters: Year, Quarter Tabs, Department -->
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Year Dropdown -->
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 mb-1 block">السنة المالية</label>
+                    <select x-model.number="filters.year" @change="fetchDashboard()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                </div>
+
+                <!-- Quarter Selector Tabs -->
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 mb-1 block">الفترة / الربع المالي</label>
+                    <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1">
+                        <button type="button" @click="setQuarter(0)"
+                                :class="filters.quarter === 0 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all">
+                            إجمالي السنة
+                        </button>
+                        <button type="button" @click="setQuarter(1)"
+                                :class="filters.quarter === 1 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all">
+                            الربع الأول (Q1)
+                        </button>
+                        <button type="button" @click="setQuarter(2)"
+                                :class="filters.quarter === 2 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all">
+                            الربع الثاني (Q2)
+                        </button>
+                        <button type="button" @click="setQuarter(3)"
+                                :class="filters.quarter === 3 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all">
+                            الربع الثالث (Q3)
+                        </button>
+                        <button type="button" @click="setQuarter(4)"
+                                :class="filters.quarter === 4 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all">
+                            الربع الرابع (Q4)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Department Selector (Locked for isolated department users) -->
+                <div class="min-w-[230px]">
+                    <label class="text-[10px] font-bold text-slate-500 mb-1 flex items-center justify-between">
+                        <span>الإدارة العامة</span>
+                        <span x-show="!actor.can_view_all_depts" class="text-[9px] text-amber-600 font-extrabold flex items-center gap-0.5">
+                            <i class="ph-fill ph-lock-key"></i> معزول على إدارتك
+                        </span>
+                    </label>
+                    <select x-model="filters.dept_name" @change="fetchDashboard()"
+                            :disabled="!actor.can_view_all_depts"
+                            :class="!actor.can_view_all_depts ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-800'"
+                            class="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                        <option value="" x-show="actor.can_view_all_depts">كافة الإدارات العامة (إجمالي الشركة)</option>
+                        <template x-for="d in availableDepartments" :key="d">
+                            <option :value="d" x-text="d"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2 self-end lg:self-center">
+                <button type="button" @click="openAddModal()"
+                        class="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-extrabold shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all">
+                    <i class="ph ph-plus-circle text-base"></i>
+                    <span>إضافة بند موازنة / وفر جديد</span>
+                </button>
+                <button type="button" @click="fetchDashboard()"
+                        class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                        title="تحديث البيانات">
+                    <i class="ph ph-arrows-clockwise text-base"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div x-show="loading" class="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-emerald-600 mb-4"></div>
+        <p class="text-slate-600 font-bold animate-pulse text-sm">جاري حساب مؤشرات الموازنة والوفورات المحققة...</p>
+    </div>
+
+    <div x-show="!loading" x-cloak class="space-y-6">
+        <!-- 📄 PAGE 1: Header + Top KPI Summary Cards + Ranking & Incentives Leaderboard -->
+        <div class="print-page-1 space-y-6">
+            {% set report_title = 'تقرير الموازنة التقديرية ونتائج ترشيد النفقات والوفورات المحققة' %}
+            {% set report_subtitle = 'الصفحة (1): الملخص التنفيذي للموازنة ولوحة الترتيب والتحفيز للإدارات العامة' %}
+            {% include 'components/report_header.html' %}
+
+            <!-- 4 Top KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-2 gap-4 print:gap-5 my-2">
+            <!-- KPI 1: Total Allocated -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-500/40 transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black text-slate-500">إجمالي المحجوز (المخصص)</p>
+                        <div class="flex items-baseline gap-1.5 mt-2">
+                            <span class="text-2xl font-black text-slate-900 font-mono" x-text="formatCurrency(kpis.total_allocated)"></span>
+                            <span class="text-[11px] font-bold text-slate-400">ج.م</span>
+                        </div>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-inner">
+                        <i class="ph ph-wallet text-2xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-[11px] font-bold text-indigo-700 bg-indigo-50/70 px-2.5 py-1 rounded-lg">
+                    <span>عدد البنود المسجلة: <strong x-text="kpis.items_count || 0"></strong></span>
+                    <span>الإدارات: <strong x-text="kpis.departments_count || 0"></strong></span>
+                </div>
+            </div>
+
+            <!-- KPI 2: Actual Spent -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden group hover:border-amber-500/40 transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black text-slate-500">المنصرف الفعلي</p>
+                        <div class="flex items-baseline gap-1.5 mt-2">
+                            <span class="text-2xl font-black text-amber-600 font-mono" x-text="formatCurrency(kpis.total_spent)"></span>
+                            <span class="text-[11px] font-bold text-slate-400">ج.م</span>
+                        </div>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-inner">
+                        <i class="ph ph-receipt text-2xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50/80 px-2.5 py-1 rounded-lg">
+                    <i class="ph ph-chart-bar"></i>
+                    <span>معدل الاستهلاك الفعلي: <strong x-text="kpis.total_allocated > 0 ? (100 - kpis.savings_pct).toFixed(1) + '%' : '0%'"></strong></span>
+                </div>
+            </div>
+
+            <!-- KPI 3: Net Savings Achieved -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-emerald-200/80 relative overflow-hidden group hover:border-emerald-500 transition-all bg-gradient-to-br from-white to-emerald-50/30">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black text-emerald-800">صافي التوفير المحقق (المحجوز - المنصرف)</p>
+                        <div class="flex items-baseline gap-1.5 mt-2">
+                            <span class="text-2xl font-black text-emerald-600 font-mono" x-text="formatCurrency(kpis.net_savings)"></span>
+                            <span class="text-[11px] font-bold text-emerald-600">ج.م</span>
+                        </div>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-100/80 text-emerald-700 border border-emerald-200 flex items-center justify-center shadow-inner">
+                        <i class="ph ph-piggy-bank text-2xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-lg">
+                    <i class="ph ph-check-circle"></i>
+                    <span>وفر مالي مباشر معتمد للتحفيز</span>
+                </div>
+            </div>
+
+            <!-- KPI 4: Rationalization Rate % -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden group hover:border-teal-500/40 transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black text-slate-500">نسبة الترشيد الإجمالية</p>
+                        <div class="flex items-baseline gap-1 mt-2">
+                            <span class="text-3xl font-black text-teal-600 font-mono" x-text="(kpis.savings_pct || 0) + '%'"></span>
+                        </div>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center shadow-inner">
+                        <i class="ph ph-trend-down text-2xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
+                    <div class="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500"
+                         :style="'width: ' + Math.min(Math.max(kpis.savings_pct || 0, 0), 100) + '%'"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🛡️ Standalone Floating KPI: Cost Avoidance (separate from cash savings) -->
+        <div class="bg-gradient-to-br from-violet-50 to-white rounded-2xl p-5 border-2 border-violet-300 shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-violet-100 text-violet-700 border border-violet-200 flex items-center justify-center shadow-inner shrink-0">
+                    <i class="ph ph-shield-check text-3xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-black text-violet-800">تفادي التكلفة (Cost Avoidance)</p>
+                    <div class="flex items-baseline gap-1.5 mt-1">
+                        <span class="text-3xl font-black text-violet-700 font-mono" x-text="formatCurrency(governance.cost_avoidance_total)"></span>
+                        <span class="text-[11px] font-bold text-violet-500">ج.م</span>
+                    </div>
+                    <p class="text-[11px] font-bold text-slate-500 mt-0.5">مصروفات / مشتريات تم تفاديها فعلياً — لا تُحتسب ضمن الوفر النقدي أعلاه</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 text-[11px] font-bold">
+                <span class="px-3 py-1.5 rounded-xl bg-violet-100 text-violet-800 border border-violet-200">
+                    بنود تفادي التكلفة: <strong x-text="governance.cost_avoidance_items"></strong>
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    وفر موثّق (HSE + مغلق): <strong class="font-mono" x-text="formatCurrency(governance.verified_savings) + ' ج.م'"></strong>
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-800 border border-rose-200">
+                    بانتظار HSE: <strong x-text="governance.pending_hse_count"></strong>
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
+                    انحرافات تحتاج تحليل: <strong x-text="governance.variance_unresolved_count"></strong>
+                </span>
+            </div>
+        </div>
+
+        <!-- 🏆 Top 3 & Lowest Saving Department Cards (لوحة الترتيب والتحفيز - Controlled by Admin Toggle) -->
+        <div x-show="leaderboardEnabled" x-cloak class="bg-slate-900 rounded-2xl p-5 shadow-xl border border-slate-800">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <i class="ph-fill ph-trophy text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-black text-white flex items-center gap-2">
+                            <span>لوحة الترتيب والتحفيز للإدارات العامة</span>
+                            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-extrabold">Incentives Leaderboard</span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400 font-semibold">أعلى 3 إدارات تحقيقاً للوفر المالي مقابل الإدارة الأقل توفيراً خلال الفترة المختارة</p>
+                    </div>
+                </div>
+                <span class="text-[11px] font-bold text-slate-300 bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-xl font-mono"
+                      x-text="filters.quarter > 0 ? ('الربع ' + filters.quarter + ' (Q' + filters.quarter + ') - ' + filters.year) : ('إجمالي عام ' + filters.year)"></span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 🥇 المركز الأول في التوفير (Top 1 Saver) -->
+                <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm hover:border-emerald-500/50 hover:shadow-emerald-950/30 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2.5">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                                <span>🥇</span> المركز الأول في التوفير
+                            </span>
+                            <i class="ph-fill ph-crown text-amber-400 text-xl"></i>
+                        </div>
+                        <h4 class="text-sm font-black text-white truncate mt-1"
+                            :title="topDepartments[0]?.dept_name"
+                            x-text="topDepartments[0]?.dept_name || '—'"></h4>
+                        <div class="mt-3 pt-2.5 border-t border-slate-700/70 flex items-baseline justify-between">
+                            <span class="text-[11px] font-bold text-slate-400">قيمة التوفير:</span>
+                            <span class="text-base font-black text-emerald-400 font-mono"
+                                  x-text="formatCurrency(topDepartments[0]?.saved_amount || 0) + ' ج.م'"></span>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between bg-emerald-950/60 border border-emerald-700/50 px-3 py-1.5 rounded-xl">
+                        <span class="text-[11px] font-bold text-emerald-200">نسبة التوفير:</span>
+                        <span class="text-xs font-black font-mono text-emerald-300"
+                              x-text="(topDepartments[0]?.savings_pct || 0) + '%'"></span>
+                    </div>
+                </div>
+
+                <!-- 🥈 المركز الثاني في التوفير (Top 2 Saver) -->
+                <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm hover:border-emerald-500/50 hover:shadow-emerald-950/30 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2.5">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-slate-300/20 text-slate-200 border border-slate-400/40">
+                                <span>🥈</span> المركز الثاني في التوفير
+                            </span>
+                            <i class="ph-fill ph-medal text-slate-300 text-xl"></i>
+                        </div>
+                        <h4 class="text-sm font-black text-white truncate mt-1"
+                            :title="topDepartments[1]?.dept_name"
+                            x-text="topDepartments[1]?.dept_name || '—'"></h4>
+                        <div class="mt-3 pt-2.5 border-t border-slate-700/70 flex items-baseline justify-between">
+                            <span class="text-[11px] font-bold text-slate-400">قيمة التوفير:</span>
+                            <span class="text-base font-black text-emerald-400 font-mono"
+                                  x-text="formatCurrency(topDepartments[1]?.saved_amount || 0) + ' ج.م'"></span>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between bg-emerald-950/60 border border-emerald-700/50 px-3 py-1.5 rounded-xl">
+                        <span class="text-[11px] font-bold text-emerald-200">نسبة التوفير:</span>
+                        <span class="text-xs font-black font-mono text-emerald-300"
+                              x-text="(topDepartments[1]?.savings_pct || 0) + '%'"></span>
+                    </div>
+                </div>
+
+                <!-- 🥉 المركز الثالث في التوفير (Top 3 Saver) -->
+                <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm hover:border-emerald-500/50 hover:shadow-emerald-950/30 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2.5">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-orange-500/20 text-orange-300 border border-orange-400/40">
+                                <span>🥉</span> المركز الثالث في التوفير
+                            </span>
+                            <i class="ph-fill ph-medal-military text-orange-400 text-xl"></i>
+                        </div>
+                        <h4 class="text-sm font-black text-white truncate mt-1"
+                            :title="topDepartments[2]?.dept_name"
+                            x-text="topDepartments[2]?.dept_name || '—'"></h4>
+                        <div class="mt-3 pt-2.5 border-t border-slate-700/70 flex items-baseline justify-between">
+                            <span class="text-[11px] font-bold text-slate-400">قيمة التوفير:</span>
+                            <span class="text-base font-black text-emerald-400 font-mono"
+                                  x-text="formatCurrency(topDepartments[2]?.saved_amount || 0) + ' ج.م'"></span>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between bg-emerald-950/60 border border-emerald-700/50 px-3 py-1.5 rounded-xl">
+                        <span class="text-[11px] font-bold text-emerald-200">نسبة التوفير:</span>
+                        <span class="text-xs font-black font-mono text-emerald-300"
+                              x-text="(topDepartments[2]?.savings_pct || 0) + '%'"></span>
+                    </div>
+                </div>
+
+                <!-- ⚠️ أقل إدارة تحقيقاً للتوفير (Lowest Saver / Needs Attention) -->
+                <div class="bg-slate-800/90 border border-amber-700/50 rounded-2xl p-4 shadow-lg backdrop-blur-sm hover:border-amber-500/50 hover:shadow-amber-950/30 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2.5">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                <span>⚠️</span> أقل إدارة تحقيقاً للتوفير
+                            </span>
+                            <i class="ph-fill ph-warning-octagon text-amber-400 text-xl"></i>
+                        </div>
+                        <h4 class="text-sm font-black text-white truncate mt-1"
+                            :title="lowestDepartment?.dept_name"
+                            x-text="lowestDepartment?.dept_name || '—'"></h4>
+                        <div class="mt-3 pt-2.5 border-t border-slate-700/70 flex items-baseline justify-between">
+                            <span class="text-[11px] font-bold text-slate-400">قيمة التوفير:</span>
+                            <span class="text-base font-black text-amber-400 font-mono"
+                                  x-text="formatCurrency(lowestDepartment?.saved_amount || 0) + ' ج.م'"></span>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between bg-amber-950/60 border border-amber-700/50 px-3 py-1.5 rounded-xl">
+                        <span class="text-[11px] font-bold text-amber-200">نسبة التوفير:</span>
+                        <span class="text-xs font-black font-mono text-amber-300"
+                              x-text="(lowestDepartment?.savings_pct || 0) + '%'"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+        <!-- End of Page 1 -->
+
+        <!-- 📊 PAGE 2: Charts ONLY (Budget vs Actual Bar Chart & Savings Share Doughnut Chart) -->
+        <div class="print-page-2">
+            {% set report_title = 'التحليل البياني للموازنة المخصصة والمنصرف الفعلي وتوزيع الوفورات' %}
+            {% set report_subtitle = 'الصفحة (2): المؤشرات الرسومية المقارنة للموازنة ونسب مساهمة الوفر' %}
+            {% include 'components/report_header.html' %}
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 print:grid-cols-1 gap-6 print:gap-6">
+                <!-- Bar Chart (2 Columns Wide on Screen, Full Width Stacked in Print) -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col lg:col-span-2 print-chart-card">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                        <div>
+                            <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+                                <i class="ph ph-chart-bar text-indigo-600 text-lg"></i>
+                                <span x-text="filters.dept_name ? 'مقارنة المخصص والمنصرف والوفر حسب البنود (' + filters.dept_name + ')' : 'مقارنة الموازنة المخصصة مقابل المنصرف الفعلي والوفر حسب الإدارة'"></span>
+                            </h3>
+                            <p class="text-[11px] text-slate-400 font-bold mt-0.5">تحليل مقارن للمبالغ المحجوزة والمنصرفة وصافي الترشيد بالجنيه المصري</p>
+                        </div>
+                        <span class="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-extrabold">Budget vs Actual</span>
+                    </div>
+                    <div class="h-72 chart-container-print">
+                        <canvas id="budgetBarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Doughnut Chart (1 Column Wide on Screen, Full Width Stacked in Print) -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col print-chart-card">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                        <div>
+                            <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+                                <i class="ph ph-chart-pie-slice text-emerald-600 text-lg"></i>
+                                <span>توزيع الوفورات المحققة</span>
+                            </h3>
+                            <p class="text-[11px] text-slate-400 font-bold mt-0.5">نسبة مساهمة كل بند / إدارة في صافي التوفير</p>
+                        </div>
+                        <span class="text-[10px] bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-extrabold">Savings Share</span>
+                    </div>
+                    <div class="h-72 chart-container-print">
+                        <canvas id="savingsDoughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- End of Page 2 -->
+
+        <!-- 📋 PAGE 3: Detailed Line-Item Table & Savings Narrative Grid -->
+        <div class="print-page-3">
+            {% set report_title = 'البيان التفصيلي لبنود الموازنة وآليات ترشيد النفقات المعتمدة' %}
+            {% set report_subtitle = 'الصفحة (3): جدول بنود الموازنة والمنصرف الفعلي وبند التوفير بالتفصيل' %}
+            {% include 'components/report_header.html' %}
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-base font-black text-slate-800 flex items-center gap-2">
+                        <i class="ph ph-table text-emerald-600 text-xl"></i>
+                        <span>بيان بنود الموازنة التفصيلي وآليات تحقيق الوفر (بند التوفير بالتفصيل)</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 font-semibold mt-0.5">يوضح المبالغ المحجوزة والمنصرفة ونسبة الوفر وشرح خطة الترشيد المتبعة لكل بند</p>
+                </div>
+                <div class="relative w-full sm:w-64 no-print">
+                    <input type="text" x-model="searchQuery" placeholder="بحث في البنود أو آلية التوفير..."
+                           class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none">
+                    <i class="ph ph-magnifying-glass absolute left-2.5 top-2.5 text-slate-400"></i>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-right text-xs border-collapse">
+                    <thead class="bg-slate-900 text-white border-b-2 border-indigo-500">
+                        <tr class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white font-black divide-x divide-x-reverse divide-slate-700/70">
+                            <th class="p-3.5 text-right tracking-wide">الإدارة العامة</th>
+                            <th class="p-3.5 text-center tracking-wide">الربع المالي</th>
+                            <th class="p-3.5 text-right tracking-wide">بند الموازنة</th>
+                            <th class="p-3.5 text-center tracking-wide">المبلغ المحجوز</th>
+                            <th class="p-3.5 text-center tracking-wide">المنصرف الفعلي</th>
+                            <th class="p-3.5 text-center tracking-wide">صافي التوفير</th>
+                            <th class="p-3.5 text-center tracking-wide">نسبة الترشيد</th>
+                            <th class="p-3.5 text-right w-[32%] tracking-wide">آلية التوفير (بند التوفير بالتفصيل)</th>
+                            <th class="p-3.5 text-center tracking-wide">بوابة HSE</th>
+                            <th class="p-3.5 text-center tracking-wide">حالة المبادرة</th>
+                            <th class="p-3.5 text-center no-print tracking-wide">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y-2 divide-slate-300 border-b-2 border-slate-400 font-bold">
+                        <template x-for="(item, idx) in filteredItems" :key="item.id">
+                            <tr :class="idx % 2 === 0 ? 'bg-white budget-zebra-odd' : 'bg-slate-200/90 budget-zebra-even'"
+                                class="budget-zebra-row odd:bg-white even:bg-slate-200/90 hover:bg-indigo-100/90 transition-colors border-b border-slate-300 divide-x divide-x-reverse divide-slate-300">
+                                <td class="p-3.5 text-slate-800">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0"></span>
+                                        <span class="font-extrabold text-slate-900" x-text="item.general_dept_name"></span>
+                                    </div>
+                                </td>
+                                <td class="p-3.5 text-center">
+                                    <span class="px-2.5 py-1 rounded-lg bg-slate-200/80 text-slate-800 border border-slate-300 font-mono text-[11px] font-black"
+                                          x-text="'Q' + item.quarter + ' / ' + item.fiscal_year"></span>
+                                </td>
+                                <td class="p-3.5 text-slate-900 font-black" x-text="item.item_name"></td>
+                                <td class="p-3.5 text-center font-mono text-slate-800 font-black" x-text="formatCurrency(item.allocated_amount) + ' ج.م'"></td>
+                                <td class="p-3.5 text-center font-mono text-amber-800 font-black" x-text="formatCurrency(item.spent_amount) + ' ج.م'"></td>
+                                <td class="p-3.5 text-center font-mono">
+                                    <span class="px-2.5 py-1 rounded-lg font-black inline-flex items-center gap-1 shadow-xs"
+                                          :class="item.savings_amount >= 0 ? 'bg-emerald-100/90 text-emerald-800 border border-emerald-300' : 'bg-rose-100/90 text-rose-800 border border-rose-300'"
+                                          x-text="formatCurrency(item.savings_amount) + ' ج.م'"></span>
+                                </td>
+                                <td class="p-3.5 text-center">
+                                    <span class="px-2.5 py-1 rounded-full text-[11px] font-black font-mono border"
+                                          :class="item.savings_pct >= 20 ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : (item.savings_pct > 0 ? 'bg-teal-100 text-teal-900 border-teal-300' : 'bg-rose-100 text-rose-800 border-rose-300')"
+                                          x-text="item.savings_pct + '%'"></span>
+                                </td>
+                                <td class="p-3.5 text-slate-800 leading-relaxed">
+                                    <div class="bg-white border border-slate-300/90 rounded-xl p-2.5 text-xs font-bold text-slate-800 flex items-start gap-2 shadow-2xs">
+                                        <i class="ph-fill ph-sparkle text-emerald-600 text-sm mt-0.5 shrink-0"></i>
+                                        <span x-text="item.savings_narrative || '—'"></span>
+                                    </div>
+                                </td>
+                                <!-- HSE & GM Validation Gates -->
+                                <td class="p-3.5 text-center">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <span x-show="item.gm_approved" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300">
+                                            <i class="ph-fill ph-check-circle"></i> معتمد GM
+                                        </span>
+                                        <span x-show="!item.gm_approved" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">
+                                            <i class="ph ph-clock"></i> بانتظار GM
+                                        </span>
+                                        <span x-show="item.hse_approved" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                            <i class="ph-fill ph-shield-check"></i> معتمد HSE
+                                        </span>
+                                        <span x-show="!item.hse_approved" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+                                            <i class="ph-fill ph-shield-warning"></i> بانتظار HSE
+                                        </span>
+                                    </div>
+                                    <div x-show="item.cost_avoidance_amount > 0" class="mt-1 text-[10px] font-bold text-violet-700 font-mono"
+                                         x-text="'تفادي: ' + formatCurrency(item.cost_avoidance_amount)"></div>
+                                </td>
+                                <!-- Workflow Status Badge -->
+                                <td class="p-3.5 text-center">
+                                    <span class="inline-flex px-2.5 py-1 rounded-full text-[11px] font-black border"
+                                          :class="statusMeta(item.workflow_status).cls"
+                                          x-text="statusMeta(item.workflow_status).label"></span>
+                                    <div x-show="item.has_variance" class="mt-1">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border"
+                                              :class="item.corrective_action ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'">
+                                            <i class="ph-fill ph-warning"></i>
+                                            <span x-text="item.corrective_action ? 'انحراف - تم التحليل' : 'انحراف - يحتاج تحليل'"></span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="p-3.5 text-center no-print">
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <button type="button" @click="openGovModal(item)"
+                                                class="p-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 transition"
+                                                title="حوكمة البند: HSE / حالة المبادرة / تفادي التكلفة">
+                                            <i class="ph ph-shield-check text-base"></i>
+                                        </button>
+                                        <button type="button" x-show="item.has_variance" @click="openVarianceModal(item)"
+                                                class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition"
+                                                title="تحليل الانحراف والإجراء التصحيحي">
+                                            <i class="ph ph-warning-diamond text-base"></i>
+                                        </button>
+                                        <button type="button" @click="openEditModal(item)"
+                                                class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition"
+                                                title="تعديل البند وآلية التوفير">
+                                            <i class="ph ph-pencil-simple text-base"></i>
+                                        </button>
+                                        <button type="button" @click="deleteItem(item)"
+                                                class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
+                                                title="حذف البند">
+                                            <i class="ph ph-trash text-base"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="filteredItems.length === 0">
+                            <td colspan="11" class="p-10 text-center text-slate-400 font-bold">
+                                لا توجد بنود موازنة مسجلة لهذه الفترة حالياً. يمكنك إضافة بند جديد من الزر العلوي.
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot x-show="filteredItems.length > 0" class="bg-slate-900 text-white font-black text-xs">
+                        <tr>
+                            <td colspan="3" class="p-3.5 text-right">الإجمالي العام للبنود المعروضة</td>
+                            <td class="p-3.5 text-center font-mono text-indigo-200" x-text="formatCurrency(kpis.total_allocated) + ' ج.م'"></td>
+                            <td class="p-3.5 text-center font-mono text-amber-300" x-text="formatCurrency(kpis.total_spent) + ' ج.م'"></td>
+                            <td class="p-3.5 text-center font-mono text-emerald-300" x-text="formatCurrency(kpis.net_savings) + ' ج.م'"></td>
+                            <td class="p-3.5 text-center font-mono text-teal-300" x-text="kpis.savings_pct + '%'"></td>
+                            <td colspan="4" class="p-3.5 text-right text-[11px] text-slate-300">
+                                صافي الوفر المحقق عن الفترة المختارة
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        </div>
+        <!-- End of Page 3 -->
+    </div>
+
+    <!-- Modal: Governance (HSE gate / workflow status / cost avoidance) -->
+    <div x-show="govModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 to-violet-950 text-white flex items-center justify-between shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2">
+                    <i class="ph ph-shield-check text-violet-300 text-xl"></i>
+                    <span>حوكمة البند: HSE وحالة المبادرة</span>
+                </h3>
+                <button type="button" @click="govModalOpen = false" class="text-slate-300 hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <form @submit.prevent="saveGovernance()" class="flex flex-col flex-1 overflow-hidden">
+                <div class="overflow-y-auto flex-1 p-6 space-y-4 text-xs">
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 font-black text-slate-800" x-text="govForm.item_name"></div>
+
+                    <!-- Department GM Approval Gate -->
+                    <label class="flex items-start gap-3 p-3 border-2 rounded-xl transition"
+                           :class="[govForm.gm_approved ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-slate-50', actor.can_approve_gm ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed']">
+                        <input type="checkbox" x-model="govForm.gm_approved" :disabled="!actor.can_approve_gm" class="w-5 h-5 mt-0.5 accent-indigo-600">
+                        <span>
+                            <span class="block font-black text-slate-800">اعتماد المدير العام للإدارة (Department GM Approval)</span>
+                            <span class="block text-[11px] font-semibold text-slate-500 mt-0.5"
+                                  x-text="actor.can_approve_gm ? 'متاح لك كمدير عام للإدارة لاعتماد المبادرة مبدئياً.' : 'مقفل: يتطلب صلاحية المدير العام للإدارة (Department GM).'"></span>
+                        </span>
+                    </label>
+
+                    <!-- HSE Officer Approval Gate -->
+                    <label class="flex items-start gap-3 p-3 border-2 rounded-xl transition"
+                           :class="[govForm.hse_approved ? 'border-emerald-300 bg-emerald-50' : 'border-rose-300 bg-rose-50', actor.can_approve_hse ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed']">
+                        <input type="checkbox" x-model="govForm.hse_approved" :disabled="!actor.can_approve_hse" class="w-5 h-5 mt-0.5 accent-emerald-600">
+                        <span>
+                            <span class="block font-black text-slate-800">اعتماد السلامة والصحة المهنية والبيئة (HSE Approved)</span>
+                            <span class="block text-[11px] font-semibold text-slate-500 mt-0.5"
+                                  x-text="actor.can_approve_hse ? 'متاح لك كمسؤول السلامة المعتمد (HSE Officer).' : 'مقفل: مخصص حصرياً لمسؤول السلامة والصحة المهنية (HSE Officer).'"></span>
+                        </span>
+                    </label>
+
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1">حالة المبادرة (Workflow Status)</label>
+                        <select x-model="govForm.workflow_status"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-800">
+                            <template x-for="s in workflowStatuses" :key="s.value">
+                                <option :value="s.value" x-text="s.label"
+                                        :disabled="s.gated && !govForm.hse_approved"></option>
+                            </template>
+                        </select>
+                        <p x-show="!govForm.hse_approved" class="mt-1 text-[11px] font-bold text-rose-600">
+                            الحالات المعتمدة وما بعدها معطلة حتى يتم اعتماد HSE.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1">تفادي التكلفة (Cost Avoidance) - ج.م</label>
+                        <input type="number" step="0.01" min="0" x-model.number="govForm.cost_avoidance_amount"
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-mono font-black text-violet-800">
+                        <p class="mt-1 text-[11px] font-semibold text-slate-500">مبالغ تم تفاديها (مشتريات/مصروفات لم تحدث) — منفصلة عن الوفر النقدي.</p>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border-t border-slate-800 p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button type="button" @click="govModalOpen = false"
+                            class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold">إلغاء</button>
+                    <button type="submit" :disabled="saving"
+                            class="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black shadow-lg disabled:opacity-50">
+                        <span x-text="saving ? 'جاري الحفظ...' : '💾 حفظ الحوكمة'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Variance Analysis & Corrective Action -->
+    <div x-show="varModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 to-amber-900 text-white flex items-center justify-between shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2">
+                    <i class="ph ph-warning-diamond text-amber-300 text-xl"></i>
+                    <span>تحليل الانحراف والإجراء التصحيحي</span>
+                </h3>
+                <button type="button" @click="varModalOpen = false" class="text-slate-300 hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <form @submit.prevent="saveVariance()" class="flex flex-col flex-1 overflow-hidden">
+                <div class="overflow-y-auto flex-1 p-6 space-y-4 text-xs">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+                        <div class="font-black text-slate-800" x-text="varForm.item_name"></div>
+                        <div class="flex flex-wrap gap-3 font-mono font-bold text-[11px]">
+                            <span class="text-indigo-800" x-text="'المحجوز: ' + formatCurrency(varForm.allocated_amount)"></span>
+                            <span class="text-amber-800" x-text="'المنصرف: ' + formatCurrency(varForm.spent_amount)"></span>
+                            <span class="text-rose-700 font-black" x-text="'الانحراف: +' + formatCurrency(varForm.variance_amount) + ' ج.م'"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1">السبب الجذري للانحراف (Root Cause) *</label>
+                        <textarea x-model="varForm.variance_root_cause" rows="3" required
+                                  placeholder="ما السبب الفعلي لتجاوز المنصرف للمحجوز؟"
+                                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-semibold text-slate-800"></textarea>
+                    </div>
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1">خطة الإجراء التصحيحي (Corrective Action) *</label>
+                        <textarea x-model="varForm.corrective_action" rows="3" required
+                                  placeholder="الإجراء المحدد لمعالجة الانحراف ومنع تكراره..."
+                                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-semibold text-slate-800"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-black text-slate-700 mb-1">المسؤول عن التنفيذ</label>
+                            <input type="text" x-model="varForm.corrective_owner"
+                                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block font-black text-slate-700 mb-1">تاريخ الاستحقاق</label>
+                            <input type="date" x-model="varForm.corrective_due_date"
+                                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-mono font-bold text-slate-800">
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border-t border-slate-800 p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button type="button" @click="varModalOpen = false"
+                            class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold">إلغاء</button>
+                    <button type="submit" :disabled="saving"
+                            class="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black shadow-lg disabled:opacity-50">
+                        <span x-text="saving ? 'جاري الحفظ...' : '💾 حفظ التحليل والإجراء'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Budget Line Item -->
+    <div x-show="modalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm no-print"
+         x-transition.opacity
+         x-cloak>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2">
+                    <i class="ph ph-coins text-emerald-400 text-xl"></i>
+                    <span x-text="form.item_id ? 'تعديل بند الموازنة وآلية التوفير' : 'إضافة بند موازنة وتفاصيل التوفير'"></span>
+                </h3>
+                <button type="button" @click="modalOpen = false" class="text-slate-300 hover:text-white">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Form Body -->
+            <form @submit.prevent="saveItem()" class="flex flex-col flex-1 overflow-hidden">
+                <div class="overflow-y-auto flex-1 p-6 space-y-4 text-xs custom-scrollbar">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-1">
+                            <label class="block font-black text-slate-700 mb-1">السنة المالية</label>
+                            <input type="number" x-model.number="form.fiscal_year" required
+                                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-mono font-bold text-slate-800">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block font-black text-slate-700 mb-1">الربع المالي</label>
+                            <select x-model.number="form.quarter" required
+                                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800">
+                                <option value="1">الربع الأول (Q1)</option>
+                                <option value="2">الربع الثاني (Q2)</option>
+                                <option value="3">الربع الثالث (Q3)</option>
+                                <option value="4">الربع الرابع (Q4)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1 flex items-center justify-between">
+                            <span>الإدارة العامة</span>
+                            <span x-show="!actor.can_view_all_depts" class="text-[10px] text-amber-600 font-bold">مقفل تلقائياً على إدارتك</span>
+                        </label>
+                        <input type="text" x-model="form.general_dept_name" list="budget-dept-list" required
+                               :readonly="!actor.can_view_all_depts"
+                               :class="!actor.can_view_all_depts ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-800'"
+                               placeholder="اختر أو اكتب اسم الإدارة العامة..."
+                               class="w-full border border-slate-200 rounded-xl px-3 py-2.5 font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                        <datalist id="budget-dept-list">
+                            <template x-for="d in availableDepartments" :key="d">
+                                <option :value="d"></option>
+                            </template>
+                        </datalist>
+                    </div>
+
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1">اسم بند الموازنة</label>
+                        <input type="text" x-model="form.item_name" required
+                               placeholder="مثال: بند مهمات وأدوات مكتبية / بند صيانة سيارات ووقود..."
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-black text-slate-700 mb-1">المبلغ المحجوز / المخصص (ج.م)</label>
+                            <input type="number" step="0.01" min="0" x-model.number="form.allocated_amount" required
+                                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-mono font-black text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-black text-slate-700 mb-1">المنصرف الفعلي (ج.م)</label>
+                            <input type="number" step="0.01" min="0" x-model.number="form.spent_amount" required
+                                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-mono font-black text-amber-700 focus:ring-2 focus:ring-amber-500/20 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Live Calculated Savings Preview -->
+                    <div class="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                        <span class="font-extrabold text-emerald-900">صافي التوفير المحسوب تلقائياً:</span>
+                        <div class="flex items-center gap-2 font-mono font-black text-sm text-emerald-700">
+                            <span x-text="formatCurrency((form.allocated_amount || 0) - (form.spent_amount || 0)) + ' ج.م'"></span>
+                            <span class="text-xs bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full"
+                                  x-text="form.allocated_amount > 0 ? (((form.allocated_amount - form.spent_amount) / form.allocated_amount) * 100).toFixed(1) + '%' : '0%'"></span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block font-black text-slate-700 mb-1">آلية التوفير (بند التوفير بالتفصيل - كيف تم تحقيق الوفر؟)</label>
+                        <textarea x-model="form.savings_narrative" rows="3"
+                                  placeholder="اشرح بالتفصيل الإجراءات المتخذة لترشيد الإنفاق وتحقيق هذا الوفر..."
+                                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Sticky Modal Footer -->
+                <div class="sticky bottom-0 bg-slate-900 border-t border-slate-800 p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button type="button" @click="modalOpen = false"
+                            class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors">
+                        إلغاء
+                    </button>
+                    <button type="submit" :disabled="saving"
+                            class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all disabled:opacity-50">
+                        <span>💾</span>
+                        <span x-text="saving ? 'جاري الحفظ...' : 'حفظ البند'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if user and user.role == 'admin' %}
+    <!-- Modal: Admin RBAC & Governance Settings (HSE Officer, Leaderboard Toggle & Dept GMs) -->
+    <div x-show="rbacModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-slate-900 text-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-emerald-500/40">
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2">
+                    <i class="ph ph-sliders-horizontal text-emerald-400 text-xl"></i>
+                    <span>إعدادات حوكمة الموازنة وصلاحيات الاعتماد (RBAC & HSE Gate)</span>
+                </h3>
+                <button type="button" @click="rbacModalOpen = false" class="text-slate-300 hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <form @submit.prevent="saveRbacSettings()" class="flex flex-col flex-1 overflow-hidden">
+                <div class="overflow-y-auto flex-1 p-6 space-y-5 text-xs custom-scrollbar">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-xl bg-slate-800/70 border border-slate-700 space-y-2">
+                            <span class="text-sm font-bold text-white flex items-center gap-1.5">
+                                <i class="ph-fill ph-shield-check text-emerald-400 text-lg"></i>
+                                مسؤول السلامة والصحة المهنية المعتمد (HSE Officer)
+                            </span>
+                            <p class="text-[11px] text-slate-400">المستخدم الوحيد المخول باعتماد بوابة السلامة (HSE Approved)</p>
+                            <input type="number" x-model.number="rbacForm.hse_officer_emp_id" placeholder="كود مسؤول HSE (مثال: 10019)"
+                                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:border-emerald-500 outline-none">
+                        </div>
+                        <label class="p-4 rounded-xl bg-slate-800/70 border border-slate-700 flex items-center justify-between gap-4 cursor-pointer hover:border-emerald-500/40 transition">
+                            <div>
+                                <span class="text-sm font-bold text-white flex items-center gap-1.5">
+                                    <i class="ph-fill ph-trophy text-amber-400 text-lg"></i>
+                                    إظهار بطاقات الترتيب والتحفيز (Top 3 & Lowest)
+                                </span>
+                                <p class="text-[11px] text-slate-400 mt-1">عرض أو إخفاء لوحة ترتيب الإدارات الأعلى والأقل توفيراً</p>
+                            </div>
+                            <input type="checkbox" x-model="rbacForm.leaderboard_enabled" class="w-6 h-6 accent-emerald-500 rounded cursor-pointer shrink-0">
+                        </label>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-black text-slate-300 mb-3 flex items-center gap-1.5">
+                            <i class="ph ph-users-three text-indigo-400 text-base"></i>
+                            <span>تعيين المدير العام المعتمد (Department GM) لكل إدارة عامة</span>
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            <template x-for="dept in availableDepartments" :key="dept">
+                                <div class="p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/70 flex items-center justify-between gap-2">
+                                    <span class="text-[11px] font-bold text-slate-200 truncate" :title="dept" x-text="dept"></span>
+                                    <input type="number" x-model.number="rbacForm.dept_gms[dept]" placeholder="كود GM"
+                                           class="w-24 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-emerald-300 font-mono font-bold text-center focus:border-emerald-500 outline-none">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-950 border-t border-slate-800 p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button type="button" @click="rbacModalOpen = false"
+                            class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold">إلغاء</button>
+                    <button type="submit" :disabled="saving"
+                            class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg disabled:opacity-50">
+                        <span x-text="saving ? 'جاري الحفظ...' : '💾 حفظ إعدادات الحوكمة'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Admin User & Employee Directory Management -->
+    <div x-show="usersModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-slate-950/80 backdrop-blur-md no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-slate-900 text-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-violet-500/40">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-violet-950 to-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-violet-600/30 border border-violet-400/30 flex items-center justify-center text-violet-300">
+                        <i class="ph-fill ph-users-three text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-black text-white flex items-center gap-2">
+                            <span>دليل الموظفين وإدارة الصلاحيات (User & Employee Directory)</span>
+                            <span class="text-xs px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 font-mono font-bold" x-text="usersList.length + ' موظف'"></span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400">إدارة سجلات العاملين، مواقع العمل، أرقام الهواتف، والصلاحيات الوظيفية والحوكمة</p>
+                    </div>
+                </div>
+                <button type="button" @click="usersModalOpen = false" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Toolbar & Filters -->
+            <div class="p-4 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-[300px]">
+                    <!-- Search input -->
+                    <div class="relative flex-1 min-w-[200px] max-w-md">
+                        <i class="ph ph-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-base"></i>
+                        <input type="text" x-model="userSearch" placeholder="بحث بالاسم، كود الموظف، الهاتف، الإيميل..."
+                               class="w-full bg-slate-950 border border-slate-700 rounded-xl pr-9 pl-3 py-2 text-xs text-white placeholder-slate-500 focus:border-violet-500 outline-none">
+                    </div>
+
+                    <!-- Department filter -->
+                    <select x-model="userDeptFilter"
+                            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-violet-500">
+                        <option value="">كل الإدارات العامة</option>
+                        <template x-for="d in availableDepartments" :key="d">
+                            <option :value="d" x-text="d"></option>
+                        </template>
+                    </select>
+
+                    <!-- Role filter -->
+                    <select x-model="userRoleFilter"
+                            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-violet-500">
+                        <option value="">كل الأدوار الوظيفية</option>
+                        <template x-for="rl in availableRoles" :key="rl">
+                            <option :value="rl" x-text="formatRoleOptionLabel(rl)"></option>
+                        </template>
+                    </select>
+
+                    <!-- Location filter -->
+                    <select x-model="userLocFilter"
+                            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-violet-500">
+                        <option value="">كل مواقع العمل</option>
+                        <template x-for="loc in availableLocations" :key="loc">
+                            <option :value="loc" x-text="loc"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Action Buttons: Manage Lookups & Add Employee -->
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" @click="openLookupManager('DEPARTMENT')"
+                            class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-bold transition cursor-pointer">
+                        <i class="ph ph-list-bullets text-base text-indigo-300"></i>
+                        <span>إدارة القوائم المنسدلة</span>
+                    </button>
+                    <button type="button" @click="openAddUserModal()"
+                            class="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition active:scale-95">
+                        <i class="ph ph-user-plus text-base"></i>
+                        <span>إضافة موظف جديد</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table content -->
+            <div class="overflow-y-auto flex-1 p-4 custom-scrollbar">
+                <template x-if="usersLoading">
+                    <div class="py-16 text-center text-slate-400">
+                        <i class="ph ph-spinner animate-spin text-3xl text-violet-400 mb-2"></i>
+                        <p class="text-xs">جاري تحميل بيانات الموظفين...</p>
+                    </div>
+                </template>
+
+                <template x-if="!usersLoading && filteredUsers.length === 0">
+                    <div class="py-16 text-center text-slate-400">
+                        <i class="ph ph-user-minus text-4xl text-slate-500 mb-2"></i>
+                        <p class="text-sm font-bold text-slate-300">لا يوجد موظفين يطابقون شروط البحث</p>
+                    </div>
+                </template>
+
+                <div x-show="!usersLoading && filteredUsers.length > 0" class="border border-slate-700 rounded-xl overflow-hidden shadow-inner">
+                    <table class="w-full text-right text-xs border-collapse">
+                        <thead class="bg-slate-950 text-white text-[11px] font-black border-b-2 border-violet-500/60">
+                            <tr class="divide-x divide-x-reverse divide-slate-800">
+                                <th class="py-3 px-3 w-16 text-center">الكود</th>
+                                <th class="py-3 px-3">الاسم الكامل والمسمى الوظيفي</th>
+                                <th class="py-3 px-3">الإدارة العامة</th>
+                                <th class="py-3 px-3">موقع العمل</th>
+                                <th class="py-3 px-3">الهاتف</th>
+                                <th class="py-3 px-3">البريد الإلكتروني</th>
+                                <th class="py-3 px-3 text-center">الدور والصلاحية</th>
+                                <th class="py-3 px-3 text-center w-28">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/80 font-sans">
+                            <template x-for="(user, uIdx) in filteredUsers" :key="user.emp_id">
+                                <tr :class="uIdx % 2 === 0 ? 'bg-slate-900/95' : 'bg-slate-800/75'"
+                                    class="odd:bg-slate-900/95 even:bg-slate-800/75 hover:bg-indigo-950/60 transition divide-x divide-x-reverse divide-slate-800/70">
+                                    <td class="py-2.5 px-3 text-center font-mono font-bold text-emerald-400" x-text="user.emp_id"></td>
+                                    <td class="py-2.5 px-3">
+                                        <div class="font-bold text-slate-100" x-text="user.name"></div>
+                                        <div class="text-[11px] text-slate-400" x-text="user.job_title || '—'"></div>
+                                    </td>
+                                    <td class="py-2.5 px-3 font-semibold text-slate-200" x-text="user.general_dept_name || '—'"></td>
+                                    <td class="py-2.5 px-3">
+                                        <span class="inline-flex items-center gap-1 text-[11px] text-slate-300">
+                                            <i class="ph ph-map-pin text-rose-400 text-xs"></i>
+                                            <span x-text="user.work_location || '—'"></span>
+                                        </span>
+                                    </td>
+                                    <td class="py-2.5 px-3 font-mono text-[11px] text-slate-300" dir="ltr" x-text="user.phone || '—'"></td>
+                                    <td class="py-2.5 px-3 font-mono text-[11px] text-indigo-300" dir="ltr" x-text="user.email || '—'"></td>
+                                    <td class="py-2.5 px-3 text-center">
+                                        <div class="flex flex-col items-center gap-1">
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border"
+                                                  :class="roleBadgeMeta(user.role).bg">
+                                                <i :class="'ph ' + roleBadgeMeta(user.role).icon"></i>
+                                                <span x-text="roleBadgeMeta(user.role).label"></span>
+                                            </span>
+                                            <template x-if="user.is_designated_hse">
+                                                <span class="text-[10px] font-bold text-cyan-400 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-800/50">بوابة HSE معتمدة</span>
+                                            </template>
+                                            <template x-if="user.designated_gm_depts && user.designated_gm_depts.length > 0">
+                                                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/50"
+                                                      :title="'معتمد لإدارة: ' + user.designated_gm_depts.join(', ')">GM معتمد</span>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    <td class="py-2.5 px-3 text-center">
+                                        <div class="flex items-center justify-center gap-1">
+                                            <!-- Edit button -->
+                                            <button type="button" @click="openEditUserModal(user)" title="تعديل بيانات الموظف"
+                                                    class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 hover:border-indigo-500/50 transition">
+                                                <i class="ph ph-pencil-simple text-sm"></i>
+                                            </button>
+                                            <!-- Reset password button -->
+                                            <button type="button" @click="openResetPasswordModal(user)" title="إعادة تعيين كلمة المرور"
+                                                    class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 hover:border-amber-500/50 transition">
+                                                <i class="ph ph-key text-sm"></i>
+                                            </button>
+                                            <!-- Delete button (hidden for 7071) -->
+                                            <button type="button" x-show="user.emp_id !== 7071" @click="deleteUser(user.emp_id, user.name)" title="حذف الموظف"
+                                                    class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400 border border-slate-700 hover:border-rose-500/50 transition">
+                                                <i class="ph ph-trash text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-slate-950 border-t border-slate-800 px-6 py-3 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="ph ph-info text-violet-400"></i>
+                    <span>العزل الإداري يطبق تلقائياً على الموظفين والمديرين العموم بحسب الإدارة العامة المحددة.</span>
+                </div>
+                <button type="button" @click="usersModalOpen = false"
+                        class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Employee Form -->
+    <div x-show="userFormModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-slate-900 text-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-emerald-500/40">
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2">
+                    <i class="ph" :class="userForm.is_edit ? 'ph-user-gear text-indigo-400' : 'ph-user-plus text-emerald-400'"></i>
+                    <span x-text="userForm.is_edit ? 'تعديل بيانات الموظف والصلاحيات' : 'إضافة موظف جديد إلى المنظومة'"></span>
+                </h3>
+                <button type="button" @click="userFormModalOpen = false" class="text-slate-400 hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+
+            <form @submit.prevent="saveUser()" class="flex flex-col flex-1 overflow-hidden">
+                <div class="overflow-y-auto flex-1 p-6 space-y-4 text-xs custom-scrollbar">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Employee ID -->
+                        <div>
+                            <label class="block font-bold text-slate-300 mb-1">رقم الموظف (الكود) <span class="text-rose-400">*</span></label>
+                            <input type="number" x-model.number="userForm.emp_id" :disabled="userForm.is_edit" required
+                                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 outline-none disabled:opacity-60">
+                        </div>
+
+                        <!-- Full Name -->
+                        <div>
+                            <label class="block font-bold text-slate-300 mb-1">الاسم الكامل <span class="text-rose-400">*</span></label>
+                            <input type="text" x-model="userForm.name" required placeholder="اسم الموظف الثلاثي أو الرباعي"
+                                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                        </div>
+
+                        <!-- Role / RBAC (Dynamic Dropdown + Lookup Manager Trigger) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block font-bold text-slate-300">الدور الوظيفي / الصلاحية <span class="text-rose-400">*</span></label>
+                                <button type="button" @click="openLookupManager('ROLE')"
+                                        class="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-0.5 cursor-pointer">
+                                    <i class="ph ph-gear-six"></i>
+                                    <span>إدارة القائمة (+ / تعديل / حذف)</span>
+                                </button>
+                            </div>
+                            <select x-model="userForm.role" required
+                                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                                <template x-for="rl in availableRoles" :key="rl">
+                                    <option :value="rl" x-text="formatRoleOptionLabel(rl)"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- General Department (Dynamic Dropdown + Lookup Manager Trigger) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block font-bold text-slate-300">الإدارة العامة <span class="text-rose-400">*</span></label>
+                                <button type="button" @click="openLookupManager('DEPARTMENT')"
+                                        class="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 cursor-pointer">
+                                    <i class="ph ph-gear-six"></i>
+                                    <span>إدارة القائمة (+ / تعديل / حذف)</span>
+                                </button>
+                            </div>
+                            <select x-model="userForm.general_dept_name" required
+                                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                                <template x-for="d in availableDepartments" :key="d">
+                                    <option :value="d" x-text="d"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Sub-department (Dynamic Dropdown + Lookup Manager Trigger) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block font-bold text-slate-300">الإدارة الفرعية / القسم</label>
+                                <button type="button" @click="openLookupManager('SUB_DEPARTMENT')"
+                                        class="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-0.5 cursor-pointer">
+                                    <i class="ph ph-gear-six"></i>
+                                    <span>إدارة القائمة (+ / تعديل / حذف)</span>
+                                </button>
+                            </div>
+                            <select x-model="userForm.dept_name"
+                                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                                <option value="">— اختر القسم / الإدارة الفرعية —</option>
+                                <template x-for="sd in availableSubDepartments" :key="sd">
+                                    <option :value="sd" x-text="sd"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Job Title (Dynamic Dropdown + Lookup Manager Trigger) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block font-bold text-slate-300">المسمى الوظيفي</label>
+                                <button type="button" @click="openLookupManager('JOB_TITLE')"
+                                        class="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5 cursor-pointer">
+                                    <i class="ph ph-gear-six"></i>
+                                    <span>إدارة القائمة (+ / تعديل / حذف)</span>
+                                </button>
+                            </div>
+                            <select x-model="userForm.job_title"
+                                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                                <option value="">— اختر المسمى الوظيفي —</option>
+                                <template x-for="jt in availableJobTitles" :key="jt">
+                                    <option :value="jt" x-text="jt"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Work Location (Dynamic Dropdown + Lookup Manager Trigger) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block font-bold text-slate-300">موقع العمل (Work Location)</label>
+                                <button type="button" @click="openLookupManager('WORK_LOCATION')"
+                                        class="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5 cursor-pointer">
+                                    <i class="ph ph-gear-six"></i>
+                                    <span>إدارة القائمة (+ / تعديل / حذف)</span>
+                                </button>
+                            </div>
+                            <select x-model="userForm.work_location"
+                                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                                <option value="">— اختر موقع العمل —</option>
+                                <template x-for="loc in availableLocations" :key="loc">
+                                    <option :value="loc" x-text="loc"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Phone -->
+                        <div>
+                            <label class="block font-bold text-slate-300 mb-1">رقم الهاتف / الموبايل</label>
+                            <input type="text" x-model="userForm.phone" placeholder="010XXXXXXXX" dir="ltr"
+                                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-emerald-500 outline-none text-right">
+                        </div>
+
+                        <!-- Email -->
+                        <div class="sm:col-span-2">
+                            <label class="block font-bold text-slate-300 mb-1">البريد الإلكتروني الرسمي</label>
+                            <input type="email" x-model="userForm.email" placeholder="name@petro-demo.local" dir="ltr"
+                                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-emerald-500 outline-none text-right">
+                        </div>
+
+                        <!-- Password -->
+                        <div class="sm:col-span-2 p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+                            <label class="block font-bold text-slate-300 mb-1">
+                                <span x-text="userForm.is_edit ? 'كلمة المرور (اتركها فارغة للإبقاء على الحالية)' : 'كلمة المرور الافتراضية'"></span>
+                            </label>
+                            <input type="password" x-model="userForm.password" placeholder="••••••••"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:border-emerald-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 border-t border-slate-800 p-4 flex items-center justify-end gap-3 shrink-0">
+                    <button type="button" @click="userFormModalOpen = false"
+                            class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold">إلغاء</button>
+                    <button type="submit" :disabled="saving"
+                            class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg disabled:opacity-50">
+                        <span x-text="saving ? 'جاري الحفظ...' : (userForm.is_edit ? '💾 حفظ التعديلات' : '✅ إضافة الموظف')"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Reset Password -->
+    <div x-show="userResetModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-slate-900 text-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-amber-500/40">
+            <div class="px-5 py-3.5 bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <h4 class="text-sm font-black flex items-center gap-2">
+                    <i class="ph ph-key text-amber-400 text-lg"></i>
+                    <span>إعادة تعيين كلمة المرور</span>
+                </h4>
+                <button type="button" @click="userResetModalOpen = false" class="text-slate-400 hover:text-white"><i class="ph ph-x"></i></button>
+            </div>
+            <form @submit.prevent="submitResetPassword()" class="p-5 space-y-4 text-xs">
+                <div>
+                    <span class="text-slate-400">الموظف: </span>
+                    <strong class="text-white" x-text="resetPasswordForm.name + ' (' + resetPasswordForm.emp_id + ')'"></strong>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">كلمة المرور الجديدة</label>
+                    <input type="password" x-model="resetPasswordForm.new_password" required minlength="4" placeholder="أدخل 4 أحرف على الأقل"
+                           class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-amber-500 outline-none">
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" @click="userResetModalOpen = false"
+                            class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700">إلغاء</button>
+                    <button type="submit" :disabled="saving"
+                            class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold disabled:opacity-50">تأكيد التغيير</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Dynamic Lookup Options Manager (Departments, Sub-Departments, Work Locations, Job Titles, Job Roles) -->
+    <div x-show="lookupModalOpen"
+         class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md no-print"
+         x-transition.opacity x-cloak>
+        <div class="bg-slate-900 text-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border border-indigo-500/50">
+            <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <h3 class="text-sm font-black flex items-center gap-2">
+                    <i class="ph ph-list-bullets text-indigo-400 text-xl"></i>
+                    <span>إدارة القوائم المنسدلة الديناميكية (إضافة / تعديل / حذف)</span>
+                </h3>
+                <button type="button" @click="closeLookupManager()" class="text-slate-400 hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+
+            <!-- Category Tabs (5 Dynamic Categories) -->
+            <div class="px-4 pt-3 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center gap-1.5 shrink-0 text-[11px] font-bold">
+                <button type="button" @click="lookupActiveCategory = 'DEPARTMENT'; editingLookupId = null"
+                        :class="lookupActiveCategory === 'DEPARTMENT' ? 'border-b-2 border-emerald-400 text-emerald-300 pb-2.5' : 'text-slate-400 hover:text-white pb-2.5'"
+                        class="px-2.5 transition cursor-pointer">الإدارات العامة</button>
+                <button type="button" @click="lookupActiveCategory = 'SUB_DEPARTMENT'; editingLookupId = null"
+                        :class="lookupActiveCategory === 'SUB_DEPARTMENT' ? 'border-b-2 border-cyan-400 text-cyan-300 pb-2.5' : 'text-slate-400 hover:text-white pb-2.5'"
+                        class="px-2.5 transition cursor-pointer">الأقسام / الإدارات الفرعية</button>
+                <button type="button" @click="lookupActiveCategory = 'WORK_LOCATION'; editingLookupId = null"
+                        :class="lookupActiveCategory === 'WORK_LOCATION' ? 'border-b-2 border-amber-400 text-amber-300 pb-2.5' : 'text-slate-400 hover:text-white pb-2.5'"
+                        class="px-2.5 transition cursor-pointer">مواقع العمل</button>
+                <button type="button" @click="lookupActiveCategory = 'JOB_TITLE'; editingLookupId = null"
+                        :class="lookupActiveCategory === 'JOB_TITLE' ? 'border-b-2 border-indigo-400 text-indigo-300 pb-2.5' : 'text-slate-400 hover:text-white pb-2.5'"
+                        class="px-2.5 transition cursor-pointer">المسميات الوظيفية</button>
+                <button type="button" @click="lookupActiveCategory = 'ROLE'; editingLookupId = null"
+                        :class="lookupActiveCategory === 'ROLE' ? 'border-b-2 border-rose-400 text-rose-300 pb-2.5' : 'text-slate-400 hover:text-white pb-2.5'"
+                        class="px-2.5 transition cursor-pointer">الدور الوظيفي / الصلاحيات</button>
+            </div>
+
+            <!-- Add New Option Bar -->
+            <form @submit.prevent="addLookupOption()" class="p-4 bg-slate-900 border-b border-slate-800 flex items-center gap-2 shrink-0">
+                <input type="text" x-model="newLookupValue" required minlength="2"
+                       :placeholder="lookupCategoryPlaceholder()"
+                       class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                <button type="submit" :disabled="saving"
+                        class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow flex items-center gap-1.5 shrink-0 disabled:opacity-50">
+                    <i class="ph ph-plus-circle text-sm"></i>
+                    <span>إضافة خيار</span>
+                </button>
+            </form>
+
+            <!-- Options List -->
+            <div class="overflow-y-auto flex-1 p-4 space-y-2 custom-scrollbar text-xs">
+                <template x-for="opt in filteredLookupOptions" :key="opt.id">
+                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/80 flex items-center justify-between gap-2 hover:border-slate-600 transition">
+                        <template x-if="editingLookupId !== opt.id">
+                            <span class="font-bold text-slate-200 flex-1"
+                                  x-text="opt.category === 'ROLE' ? formatRoleOptionLabel(opt.value) : opt.value"></span>
+                        </template>
+                        <template x-if="editingLookupId === opt.id">
+                            <input type="text" x-model="editingLookupValue"
+                                   class="flex-1 bg-slate-950 border border-indigo-500 rounded-lg px-2.5 py-1 text-xs text-white outline-none">
+                        </template>
+
+                        <div class="flex items-center gap-1 shrink-0">
+                            <template x-if="editingLookupId !== opt.id">
+                                <button type="button" @click="startEditLookup(opt)" title="تعديل الاسم"
+                                        class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-indigo-300 border border-slate-700">
+                                    <i class="ph ph-pencil-simple"></i>
+                                </button>
+                            </template>
+                            <template x-if="editingLookupId === opt.id">
+                                <button type="button" @click="saveEditLookup(opt)" title="حفظ التعديل"
+                                        class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
+                                    حفظ
+                                </button>
+                            </template>
+                            <template x-if="editingLookupId === opt.id">
+                                <button type="button" @click="editingLookupId = null" title="إلغاء"
+                                        class="px-2 py-1 rounded-lg bg-slate-700 text-slate-300">
+                                    إلغاء
+                                </button>
+                            </template>
+                            <button type="button" @click="deleteLookupOption(opt)" title="حذف من القائمة"
+                                    class="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-rose-400 border border-slate-700">
+                                <i class="ph ph-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="bg-slate-950 border-t border-slate-800 px-6 py-3 flex items-center justify-end shrink-0">
+                <button type="button" @click="closeLookupManager()"
+                        class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold">تم / إغلاق والعودة لدليل الموظفين</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include 'components/report_footer.html' %}
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let budgetCharts = { bar: null, doughnut: null };
+
+function budgetDashboard() {
+    return {
+        loading: true,
+        saving: false,
+        modalOpen: false,
+        searchQuery: '',
+        filters: {
+            year: 2026,
+            quarter: 3,
+            dept_name: ''
+        },
+        kpis: {
+            total_allocated: 0,
+            total_spent: 0,
+            net_savings: 0,
+            savings_pct: 0,
+            items_count: 0,
+            departments_count: 0
+        },
+        lineItems: [],
+        availableDepartments: [],
+        topDepartments: [],
+        lowestDepartment: null,
+        chartsData: {
+            bar: { labels: [], allocated: [], spent: [], savings: [] },
+            doughnut: { labels: [], values: [] }
+        },
+        form: {
+            item_id: null,
+            general_dept_name: 'الشئون الإدارية',
+            fiscal_year: 2026,
+            quarter: 3,
+            item_name: '',
+            allocated_amount: 0,
+            spent_amount: 0,
+            savings_narrative: ''
+        },
+        toast: { show: false, message: '', type: 'success' },
+
+        // --- Governance: RBAC Actor, Role Simulator, HSE gate / workflow / cost avoidance / variance ---
+        leaderboardEnabled: true,
+        actor: {
+            emp_id: {{ user.emp_id | tojson if user else 7071 }},
+            name: {{ user.name | tojson if user else "'مدير النظام'" }},
+            job_title: {{ user.job_title | tojson if user else "'مدير النظام وتقنية المعلومات'" }},
+            general_dept: {{ user.department | tojson if user else "''" }},
+            is_real_admin: {{ 'true' if (user and user.role == 'admin') else 'false' }},
+            effective_role: {{ (user.role | upper) | tojson if user else "'EMPLOYEE'" }},
+            effective_dept: {{ user.department | tojson if user else "''" }},
+            can_view_all_depts: {{ 'true' if (user and user.role in ('admin', 'hse_officer')) else 'false' }},
+            can_approve_hse: {{ 'true' if (user and user.role in ('admin', 'hse_officer')) else 'false' }},
+            can_approve_gm: {{ 'true' if (user and user.role in ('admin', 'dept_gm', 'manager')) else 'false' }}
+        },
+        simulator: {
+            role: 'ADMIN',
+            dept: 'الشئون الإدارية'
+        },
+        governance: { cost_avoidance_total: 0, cost_avoidance_items: 0, verified_savings: 0, pending_hse_count: 0, variance_count: 0, variance_unresolved_count: 0 },
+        govModalOpen: false,
+        varModalOpen: false,
+        rbacModalOpen: false,
+        rbacForm: { hse_officer_emp_id: 10019, leaderboard_enabled: true, dept_gms: {} },
+        usersModalOpen: false,
+        userFormModalOpen: false,
+        userResetModalOpen: false,
+        lookupModalOpen: false,
+        lookupActiveCategory: 'DEPARTMENT',
+        newLookupValue: '',
+        editingLookupId: null,
+        editingLookupValue: '',
+        usersLoading: false,
+        userSearch: '',
+        userDeptFilter: '',
+        userRoleFilter: '',
+        userLocFilter: '',
+        usersList: [],
+        availableSubDepartments: [],
+        availableLocations: [],
+        availableJobTitles: [],
+        availableRoles: ['employee', 'dept_gm', 'hse_officer', 'admin'],
+        lookupOptions: [],
+        userForm: {
+            is_edit: false,
+            emp_id: '',
+            name: '',
+            password: '',
+            role: 'employee',
+            general_dept_name: '',
+            dept_name: '',
+            job_title: '',
+            work_location: '',
+            phone: '',
+            email: '',
+            is_active: true
+        },
+        resetPasswordForm: {
+            emp_id: null,
+            name: '',
+            new_password: ''
+        },
+
+        get filteredLookupOptions() {
+            return (this.lookupOptions || []).filter(o => o.category === this.lookupActiveCategory);
+        },
+
+        get filteredUsers() {
+            let list = this.usersList || [];
+            if (this.userDeptFilter) {
+                list = list.filter(u => u.general_dept_name === this.userDeptFilter);
+            }
+            if (this.userRoleFilter) {
+                list = list.filter(u => u.role === this.userRoleFilter);
+            }
+            if (this.userLocFilter) {
+                list = list.filter(u => u.work_location === this.userLocFilter);
+            }
+            if (this.userSearch && this.userSearch.trim()) {
+                const q = this.userSearch.trim().toLowerCase();
+                list = list.filter(u => 
+                    String(u.emp_id).includes(q) ||
+                    (u.name && u.name.toLowerCase().includes(q)) ||
+                    (u.phone && u.phone.includes(q)) ||
+                    (u.email && u.email.toLowerCase().includes(q)) ||
+                    (u.job_title && u.job_title.toLowerCase().includes(q))
+                );
+            }
+            return list;
+        },
+        govForm: { id: null, item_name: '', gm_approved: false, hse_approved: false, workflow_status: 'NEW', cost_avoidance_amount: 0 },
+        varForm: { id: null, item_name: '', allocated_amount: 0, spent_amount: 0, variance_amount: 0, variance_root_cause: '', corrective_action: '', corrective_owner: '', corrective_due_date: '' },
+        workflowStatuses: [
+            { value: 'NEW', label: 'جديدة', gated: false, cls: 'bg-slate-100 text-slate-700 border-slate-300' },
+            { value: 'UNDER_EVALUATION', label: 'قيد التقييم', gated: false, cls: 'bg-sky-100 text-sky-800 border-sky-300' },
+            { value: 'APPROVED', label: 'معتمدة', gated: true, cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+            { value: 'IN_PROGRESS', label: 'قيد التنفيذ', gated: true, cls: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+            { value: 'UNDER_VERIFICATION', label: 'قيد التحقق', gated: true, cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+            { value: 'CLOSED', label: 'مغلقة', gated: true, cls: 'bg-teal-600 text-white border-teal-700' }
+        ],
+
+        roleBadgeLabel() {
+            const r = this.actor.effective_role;
+            if (r === 'ADMIN') return 'مدير النظام (صلاحية كاملة)';
+            if (r === 'HSE_OFFICER') return 'مسؤول السلامة المعتمد (HSE Officer)';
+            if (r === 'DEPT_GM') return 'مدير عام: ' + (this.actor.effective_dept || '');
+            return 'موظف إدارة: ' + (this.actor.effective_dept || '');
+        },
+
+        onSimulatorChange() {
+            if (this.simulator.role === 'EMPLOYEE' || this.simulator.role === 'DEPT_GM') {
+                if (!this.simulator.dept) {
+                    this.simulator.dept = this.availableDepartments[0] || 'الشئون الإدارية';
+                }
+                this.filters.dept_name = this.simulator.dept;
+            } else {
+                this.filters.dept_name = '';
+            }
+            this.fetchDashboard();
+        },
+
+        statusMeta(value) {
+            return this.workflowStatuses.find(s => s.value === value) || this.workflowStatuses[0];
+        },
+
+        {% if user and user.role == 'admin' %}
+        async openRbacSettingsModal() {
+            try {
+                const res = await fetch('/api/v2/budget/governance-settings');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.rbacForm.hse_officer_emp_id = data.hse_officer?.emp_id || '';
+                    this.rbacForm.leaderboard_enabled = data.leaderboard_enabled !== false;
+                    const gms = {};
+                    (data.available_departments || this.availableDepartments || []).forEach(d => {
+                        gms[d] = data.gm_map?.[d]?.emp_id || '';
+                    });
+                    this.rbacForm.dept_gms = gms;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            this.rbacModalOpen = true;
+        },
+
+        async saveRbacSettings() {
+            this.saving = true;
+            try {
+                const cleanGms = {};
+                Object.keys(this.rbacForm.dept_gms || {}).forEach(k => {
+                    const val = this.rbacForm.dept_gms[k];
+                    cleanGms[k] = val ? parseInt(val) : null;
+                });
+                const res = await fetch('/api/v2/budget/governance-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        hse_officer_emp_id: this.rbacForm.hse_officer_emp_id ? parseInt(this.rbacForm.hse_officer_emp_id) : null,
+                        leaderboard_enabled: !!this.rbacForm.leaderboard_enabled,
+                        dept_gms: cleanGms
+                    })
+                });
+                if (res.ok) {
+                    this.rbacModalOpen = false;
+                    this.showToast('تم حفظ إعدادات حوكمة الموازنة بنجاح', 'success');
+                    await this.fetchDashboard();
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل الحفظ', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        applyLookupPayload(data) {
+            if (data.departments || data.available_departments) {
+                this.availableDepartments = data.departments || data.available_departments;
+            }
+            if (data.sub_departments || data.available_sub_departments) {
+                this.availableSubDepartments = data.sub_departments || data.available_sub_departments;
+            }
+            if (data.work_locations || data.available_locations) {
+                this.availableLocations = data.work_locations || data.available_locations;
+            }
+            if (data.job_titles || data.available_job_titles) {
+                this.availableJobTitles = data.job_titles || data.available_job_titles;
+            }
+            if (data.roles || data.available_roles) {
+                this.availableRoles = data.roles || data.available_roles;
+            }
+            if (data.options || data.lookup_options) {
+                this.lookupOptions = data.options || data.lookup_options;
+            }
+        },
+
+        lookupCategoryPlaceholder() {
+            switch (this.lookupActiveCategory) {
+                case 'DEPARTMENT': return 'أدخل اسم إدارة عامة جديدة...';
+                case 'SUB_DEPARTMENT': return 'أدخل اسم قسم / إدارة فرعية جديدة...';
+                case 'WORK_LOCATION': return 'أدخل اسم موقع عمل جديد...';
+                case 'JOB_TITLE': return 'أدخل مسمى وظيفي جديد...';
+                case 'ROLE': return 'أدخل دور وظيفي / صلاحية جديدة...';
+                default: return 'أدخل خياراً جديداً...';
+            }
+        },
+
+        formatRoleOptionLabel(role) {
+            if (!role) return '—';
+            const r = String(role).toLowerCase().trim();
+            if (r === 'admin') return 'مدير النظام (admin) — صلاحية شاملة';
+            if (r === 'dept_gm' || r === 'manager') return 'مدير عام إدارة (dept_gm) — اعتماد مالي لإدارته';
+            if (r === 'hse_officer') return 'مسؤول سلامة (hse_officer) — بوابة السلامة للكل';
+            if (r === 'employee') return 'موظف قياسي (employee) — إدارته فقط';
+            return role;
+        },
+
+        async openLookupManager(category = 'DEPARTMENT') {
+            this.lookupActiveCategory = category;
+            this.editingLookupId = null;
+            this.newLookupValue = '';
+            try {
+                const res = await fetch('/api/v2/budget/lookups');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyLookupPayload(data);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            this.lookupModalOpen = true;
+        },
+
+        closeLookupManager() {
+            this.lookupModalOpen = false;
+            this.editingLookupId = null;
+            this.usersModalOpen = true;
+        },
+
+        async addLookupOption() {
+            if (!this.newLookupValue || this.newLookupValue.trim().length < 2) {
+                this.showToast('يرجى إدخال اسم صالح لا يقل عن حرفين', 'error');
+                return;
+            }
+            this.saving = true;
+            try {
+                const res = await fetch('/api/v2/budget/lookups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: this.lookupActiveCategory,
+                        value: this.newLookupValue.trim()
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyLookupPayload(data);
+                    if (this.lookupActiveCategory === 'DEPARTMENT') {
+                        this.userForm.general_dept_name = this.newLookupValue.trim();
+                    } else if (this.lookupActiveCategory === 'SUB_DEPARTMENT') {
+                        this.userForm.dept_name = this.newLookupValue.trim();
+                    } else if (this.lookupActiveCategory === 'WORK_LOCATION') {
+                        this.userForm.work_location = this.newLookupValue.trim();
+                    } else if (this.lookupActiveCategory === 'JOB_TITLE') {
+                        this.userForm.job_title = this.newLookupValue.trim();
+                    } else if (this.lookupActiveCategory === 'ROLE') {
+                        this.userForm.role = this.newLookupValue.trim();
+                    }
+                    this.newLookupValue = '';
+                    this.showToast(data.message || 'تمت الإضافة بنجاح', 'success');
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل الإضافة', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        startEditLookup(opt) {
+            this.editingLookupId = opt.id;
+            this.editingLookupValue = opt.value;
+        },
+
+        async saveEditLookup(opt) {
+            if (!this.editingLookupValue || this.editingLookupValue.trim().length < 2) {
+                this.showToast('يرجى إدخال اسم صالح', 'error');
+                return;
+            }
+            this.saving = true;
+            try {
+                const res = await fetch(`/api/v2/budget/lookups/${opt.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        value: this.editingLookupValue.trim(),
+                        is_active: true
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyLookupPayload(data);
+                    this.editingLookupId = null;
+                    this.showToast(data.message || 'تم التحديث بنجاح', 'success');
+                    await this.fetchUsers();
+                    await this.fetchDashboard();
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل التحديث', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async deleteLookupOption(opt) {
+            if (!confirm(`هل أنت متأكد من حذف (${opt.value}) من القائمة المنسدلة؟`)) {
+                return;
+            }
+            this.saving = true;
+            try {
+                const res = await fetch(`/api/v2/budget/lookups/${opt.id}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyLookupPayload(data);
+                    this.showToast(data.message || 'تم الحذف بنجاح', 'success');
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل الحذف', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async openUsersModal() {
+            this.usersModalOpen = true;
+            await this.fetchUsers();
+        },
+
+        async fetchUsers() {
+            this.usersLoading = true;
+            try {
+                const res = await fetch('/api/v2/budget/users');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.usersList = data.users || [];
+                    this.applyLookupPayload(data);
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'تعذر تحميل قائمة الموظفين', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.usersLoading = false;
+            }
+        },
+
+        openAddUserModal() {
+            this.userForm = {
+                is_edit: false,
+                emp_id: '',
+                name: '',
+                password: '123456',
+                role: this.availableRoles.includes('employee') ? 'employee' : (this.availableRoles[0] || 'employee'),
+                general_dept_name: this.availableDepartments[0] || 'الشئون الإدارية',
+                dept_name: this.availableSubDepartments[0] || '',
+                job_title: this.availableJobTitles[0] || 'أخصائي أول موازنة وتخطيط',
+                work_location: this.availableLocations[0] || 'المركز الرئيسي - القاهرة',
+                phone: '',
+                email: '',
+                is_active: true
+            };
+            this.userFormModalOpen = true;
+        },
+
+        openEditUserModal(user) {
+            this.userForm = {
+                is_edit: true,
+                emp_id: user.emp_id,
+                name: user.name,
+                password: '',
+                role: user.role,
+                general_dept_name: user.general_dept_name || '',
+                dept_name: user.dept_name || '',
+                job_title: user.job_title || '',
+                work_location: user.work_location || '',
+                phone: user.phone || '',
+                email: user.email || '',
+                is_active: user.is_active !== false
+            };
+            this.userFormModalOpen = true;
+        },
+
+        async saveUser() {
+            if (!this.userForm.name || !this.userForm.emp_id) {
+                this.showToast('يرجى ملء كود الموظف والاسم', 'error');
+                return;
+            }
+            this.saving = true;
+            try {
+                let res;
+                if (this.userForm.is_edit) {
+                    const payload = {
+                        name: this.userForm.name,
+                        role: this.userForm.role,
+                        general_dept_name: this.userForm.general_dept_name,
+                        dept_name: this.userForm.dept_name,
+                        job_title: this.userForm.job_title,
+                        work_location: this.userForm.work_location,
+                        phone: this.userForm.phone,
+                        email: this.userForm.email,
+                        is_active: this.userForm.is_active
+                    };
+                    if (this.userForm.password && this.userForm.password.trim()) {
+                        payload.password = this.userForm.password.trim();
+                    }
+                    res = await fetch(`/api/v2/budget/users/${this.userForm.emp_id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await fetch('/api/v2/budget/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            emp_id: parseInt(this.userForm.emp_id),
+                            name: this.userForm.name,
+                            password: this.userForm.password || 'password123',
+                            role: this.userForm.role,
+                            general_dept_name: this.userForm.general_dept_name,
+                            dept_name: this.userForm.dept_name,
+                            job_title: this.userForm.job_title,
+                            work_location: this.userForm.work_location,
+                            phone: this.userForm.phone,
+                            email: this.userForm.email,
+                            is_active: this.userForm.is_active
+                        })
+                    });
+                }
+
+                if (res.ok) {
+                    const data = await res.json();
+                    this.userFormModalOpen = false;
+                    this.showToast(data.message || 'تم حفظ الموظف بنجاح', 'success');
+                    await this.fetchUsers();
+                    await this.fetchDashboard();
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل حفظ الموظف', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async deleteUser(empId, empName) {
+            if (empId === 7071) {
+                this.showToast('لا يمكن حذف حساب مدير النظام الأساسي (7071)', 'error');
+                return;
+            }
+            if (!confirm(`هل أنت متأكد من رغبتك في حذف حساب الموظف (${empName} - كود ${empId})؟`)) {
+                return;
+            }
+            this.saving = true;
+            try {
+                const res = await fetch(`/api/v2/budget/users/${empId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.showToast(data.message || 'تم الحذف بنجاح', 'success');
+                    await this.fetchUsers();
+                    await this.fetchDashboard();
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل حذف الموظف', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        openResetPasswordModal(user) {
+            this.resetPasswordForm = {
+                emp_id: user.emp_id,
+                name: user.name,
+                new_password: ''
+            };
+            this.userResetModalOpen = true;
+        },
+
+        async submitResetPassword() {
+            if (!this.resetPasswordForm.new_password || this.resetPasswordForm.new_password.length < 4) {
+                this.showToast('يرجى إدخال كلمة مرور جديدة (4 أحرف على الأقل)', 'error');
+                return;
+            }
+            this.saving = true;
+            try {
+                const res = await fetch(`/api/v2/budget/users/${this.resetPasswordForm.emp_id}/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        new_password: this.resetPasswordForm.new_password
+                    })
+                });
+                if (res.ok) {
+                    this.userResetModalOpen = false;
+                    this.showToast('تمت إعادة تعيين كلمة المرور بنجاح', 'success');
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل إعادة التعيين', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        roleBadgeMeta(role) {
+            const r = String(role || '').toLowerCase().trim();
+            switch(r) {
+                case 'admin':
+                    return { label: 'مدير النظام (Admin)', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', icon: 'ph-shield-check' };
+                case 'dept_gm':
+                case 'manager':
+                    return { label: 'مدير عام (Dept GM)', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', icon: 'ph-crown' };
+                case 'hse_officer':
+                    return { label: 'مسؤول سلامة (HSE)', bg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30', icon: 'ph-shield' };
+                case 'employee':
+                case '':
+                    return { label: 'موظف قياسي (Employee)', bg: 'bg-slate-500/10 text-slate-300 border-slate-500/30', icon: 'ph-user' };
+                default:
+                    return { label: role, bg: 'bg-violet-500/10 text-violet-300 border-violet-500/30', icon: 'ph-identification-badge' };
+            }
+        },
+        {% endif %}
+
+        openGovModal(item) {
+            this.govForm = {
+                id: item.id,
+                item_name: item.item_name + ' — ' + item.general_dept_name,
+                gm_approved: !!item.gm_approved,
+                hse_approved: !!item.hse_approved,
+                workflow_status: item.workflow_status || 'NEW',
+                cost_avoidance_amount: item.cost_avoidance_amount || 0
+            };
+            this.govModalOpen = true;
+        },
+
+        async saveGovernance() {
+            const meta = this.statusMeta(this.govForm.workflow_status);
+            if (meta.gated && !this.govForm.hse_approved) {
+                this.showToast('بوابة HSE: يلزم اعتماد السلامة أولاً', 'error');
+                return;
+            }
+            this.saving = true;
+            try {
+                const res = await fetch(`/api/v2/budget/line-item/${this.govForm.id}/governance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        workflow_status: this.govForm.workflow_status,
+                        gm_approved: this.govForm.gm_approved,
+                        hse_approved: this.govForm.hse_approved,
+                        cost_avoidance_amount: this.govForm.cost_avoidance_amount || 0,
+                        simulate_role: this.simulator.role,
+                        simulate_dept: this.simulator.dept
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.govModalOpen = false;
+                    this.showToast(data.message || 'تم الحفظ', 'success');
+                    await this.fetchDashboard();
+                } else {
+                    this.showToast(data.detail || 'فشل الحفظ', 'error');
+                }
+            } catch (e) {
+                this.showToast('حدث خطأ أثناء الحفظ', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+
+        openVarianceModal(item) {
+            this.varForm = {
+                id: item.id,
+                item_name: item.item_name + ' — ' + item.general_dept_name,
+                allocated_amount: item.allocated_amount,
+                spent_amount: item.spent_amount,
+                variance_amount: item.variance_amount,
+                variance_root_cause: item.variance_root_cause || '',
+                corrective_action: item.corrective_action || '',
+                corrective_owner: item.corrective_owner || '',
+                corrective_due_date: item.corrective_due_date || ''
+            };
+            this.varModalOpen = true;
+        },
+
+        async saveVariance() {
+            this.saving = true;
+            try {
+                const res = await fetch(`/api/v2/budget/line-item/${this.varForm.id}/variance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        variance_root_cause: this.varForm.variance_root_cause,
+                        corrective_action: this.varForm.corrective_action,
+                        corrective_owner: this.varForm.corrective_owner || null,
+                        corrective_due_date: this.varForm.corrective_due_date || null
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.varModalOpen = false;
+                    this.showToast(data.message || 'تم الحفظ', 'success');
+                    await this.fetchDashboard();
+                } else {
+                    this.showToast(typeof data.detail === 'string' ? data.detail : 'تحقق من البيانات المدخلة', 'error');
+                }
+            } catch (e) {
+                this.showToast('حدث خطأ أثناء الحفظ', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+
+        async init() {
+            await this.fetchDashboard();
+        },
+
+        setQuarter(q) {
+            this.filters.quarter = q;
+            this.fetchDashboard();
+        },
+
+        formatCurrency(val) {
+            const num = Number(val || 0);
+            return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        },
+
+        get filteredItems() {
+            if (!this.searchQuery || !this.searchQuery.trim()) {
+                return this.lineItems;
+            }
+            const q = this.searchQuery.trim().toLowerCase();
+            return this.lineItems.filter(it =>
+                (it.item_name && it.item_name.toLowerCase().includes(q)) ||
+                (it.general_dept_name && it.general_dept_name.toLowerCase().includes(q)) ||
+                (it.savings_narrative && it.savings_narrative.toLowerCase().includes(q))
+            );
+        },
+
+        showToast(message, type = 'success') {
+            this.toast = { show: true, message, type };
+            setTimeout(() => { this.toast.show = false; }, 3500);
+        },
+
+        async fetchDashboard() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams();
+                params.set('year', this.filters.year);
+                if (this.filters.quarter && this.filters.quarter > 0) {
+                    params.set('quarter', this.filters.quarter);
+                }
+                if (this.filters.dept_name) {
+                    params.set('dept_name', this.filters.dept_name);
+                }
+                if (this.simulator.role && this.simulator.role !== 'ADMIN') {
+                    params.set('simulate_role', this.simulator.role);
+                    if (this.simulator.dept) {
+                        params.set('simulate_dept', this.simulator.dept);
+                    }
+                }
+
+                const res = await fetch(`/api/v2/budget/dashboard-data?${params.toString()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.actor) {
+                        this.actor = data.actor;
+                        if (!this.actor.can_view_all_depts && this.actor.effective_dept) {
+                            this.filters.dept_name = this.actor.effective_dept;
+                        }
+                    }
+                    this.leaderboardEnabled = data.leaderboard_enabled !== false;
+                    this.kpis = data.kpis || this.kpis;
+                    this.lineItems = data.line_items || [];
+                    this.availableDepartments = data.available_departments || [];
+                    this.topDepartments = data.top_departments || [];
+                    this.lowestDepartment = data.lowest_department || null;
+                    this.governance = data.governance_kpis || this.governance;
+                    this.chartsData = data.charts || this.chartsData;
+                    this.renderCharts();
+                } else {
+                    this.showToast('تعذر تحميل بيانات الموازنة', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        openAddModal() {
+            const lockedDept = (!this.actor.can_view_all_depts && this.actor.effective_dept)
+                ? this.actor.effective_dept
+                : (this.filters.dept_name || 'الشئون الإدارية');
+            this.form = {
+                item_id: null,
+                general_dept_name: lockedDept,
+                fiscal_year: this.filters.year || 2026,
+                quarter: (this.filters.quarter && this.filters.quarter > 0) ? this.filters.quarter : 3,
+                item_name: '',
+                allocated_amount: 50000,
+                spent_amount: 35000,
+                savings_narrative: '',
+                simulate_role: this.simulator.role,
+                simulate_dept: this.simulator.dept
+            };
+            this.modalOpen = true;
+        },
+
+        openEditModal(item) {
+            this.form = {
+                item_id: item.id,
+                general_dept_name: item.general_dept_name,
+                fiscal_year: item.fiscal_year,
+                quarter: item.quarter,
+                item_name: item.item_name,
+                allocated_amount: item.allocated_amount,
+                spent_amount: item.spent_amount,
+                savings_narrative: item.savings_narrative === '—' ? '' : item.savings_narrative,
+                simulate_role: this.simulator.role,
+                simulate_dept: this.simulator.dept
+            };
+            this.modalOpen = true;
+        },
+
+        async saveItem() {
+            this.saving = true;
+            try {
+                const res = await fetch('/api/v2/budget/line-item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.form)
+                });
+                if (res.ok) {
+                    this.modalOpen = false;
+                    this.showToast('تم حفظ بند الموازنة وآلية التوفير بنجاح', 'success');
+                    await this.fetchDashboard();
+                } else {
+                    const err = await res.json();
+                    this.showToast(err.detail || 'فشل في حفظ البند', 'error');
+                }
+            } catch (e) {
+                this.showToast('حدث خطأ أثناء الحفظ', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+
+        async deleteItem(item) {
+            if (!confirm(`هل أنت متأكد من حذف "${item.item_name}"؟`)) return;
+            try {
+                const res = await fetch(`/api/v2/budget/line-item/${item.id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    this.showToast('تم حذف البند بنجاح', 'success');
+                    await this.fetchDashboard();
+                } else {
+                    this.showToast('تعذر حذف البند', 'error');
+                }
+            } catch (e) {
+                this.showToast('خطأ في الاتصال بالخادم', 'error');
+            }
+        },
+
+        renderCharts() {
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js is not loaded yet');
+                return;
+            }
+            if (budgetCharts.bar) {
+                budgetCharts.bar.destroy();
+                budgetCharts.bar = null;
+            }
+            if (budgetCharts.doughnut) {
+                budgetCharts.doughnut.destroy();
+                budgetCharts.doughnut = null;
+            }
+
+            setTimeout(() => {
+                const barCtx = document.getElementById('budgetBarChart');
+                if (barCtx && this.chartsData.bar) {
+                    budgetCharts.bar = new Chart(barCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: this.chartsData.bar.labels,
+                            datasets: [
+                                {
+                                    label: 'المبلغ المحجوز (المخصص)',
+                                    data: this.chartsData.bar.allocated,
+                                    backgroundColor: '#4f46e5',
+                                    borderRadius: 6
+                                },
+                                {
+                                    label: 'المنصرف الفعلي',
+                                    data: this.chartsData.bar.spent,
+                                    backgroundColor: '#f59e0b',
+                                    borderRadius: 6
+                                },
+                                {
+                                    label: 'صافي التوفير المحقق',
+                                    data: this.chartsData.bar.savings,
+                                    backgroundColor: '#10b981',
+                                    borderRadius: 6
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: { font: { family: 'Cairo', size: 11, weight: 'bold' }, boxWidth: 12 }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: { color: '#f1f5f9' },
+                                    ticks: { font: { family: 'Cairo', size: 10 } }
+                                },
+                                x: {
+                                    grid: { display: false },
+                                    ticks: { font: { family: 'Cairo', size: 11, weight: 'bold' } }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                const doughnutCtx = document.getElementById('savingsDoughnutChart');
+                if (doughnutCtx && this.chartsData.doughnut) {
+                    budgetCharts.doughnut = new Chart(doughnutCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: this.chartsData.doughnut.labels,
+                            datasets: [{
+                                data: this.chartsData.doughnut.values,
+                                backgroundColor: [
+                                    '#10b981', '#4f46e5', '#0ea5e9', '#f59e0b',
+                                    '#8b5cf6', '#14b8a6', '#ec4899', '#f43f5e'
+                                ],
+                                borderWidth: 2,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '62%',
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { font: { family: 'Cairo', size: 11, weight: 'bold' }, boxWidth: 12 }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, 60);
+        }
+    };
+}
+</script>
+{% include 'components/footer.html' %}
+{% endblock %}
