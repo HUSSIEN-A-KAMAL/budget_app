@@ -96,18 +96,12 @@ async def budget_dashboard_page(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
-    return templates.TemplateResponse("budget_dashboard.html", {
-        "request": request,
-        "user": user
-    })
+    return templates.TemplateResponse(request, "budget_dashboard.html", {"user": user})
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    user = get_current_user(request)
-    if user:
-        return RedirectResponse(url="/budget-dashboard", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", {})
 
 
 @app.post("/login", response_class=HTMLResponse)
